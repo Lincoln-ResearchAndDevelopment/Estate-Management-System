@@ -1,73 +1,38 @@
-# Lincoln Estate Management System - Finance Subsystem
+# Estate Management System (Army Estate Phase One)
 
-A decoupled Real Estate Management & Billing System built with **Next.js 14** (App Router, Tailwind CSS, TypeScript, Recharts) and **Laravel 11** (REST API, Eloquent, Paystack Gateway).
+One repo, two apps:
 
----
+| Folder | Stack | Run |
+|---|---|---|
+| `backend/`  | Laravel 12, Sanctum, Spatie permissions, MySQL | `composer install && cp .env.example .env && php artisan key:generate && php artisan migrate --seed && php artisan serve` |
+| `frontend/` | Next.js 16, React 19, Tailwind 4 | `npm install && cp .env.local.example .env.local && npm run dev` |
 
-## Architecture Overview
+**Status: assembled, not yet built or run.** The workspace that merged this had no access to npm or Packagist, so
+`npm run build` and `composer install` have never been run on it. PHP files pass `php -l`; every `@/…` and relative
+import in the front end was checked to resolve to a real file. Expect a first round of build fixes (see MERGE_NOTES.md).
 
-```text
-estatemanagement/
-├── backend/                   # Laravel REST API Subsystem
-│   ├── app/
-│   │   ├── Http/Controllers/Api/  # FinanceDashboardController, PaymentController, etc.
-│   │   └── Models/                # ServiceCharge, Invoice, Payment, Receipt
-│   ├── database/migrations/       # Database schemas with Paystack references
-│   └── routes/api.php             # /api/v1/finance/...
-│
-└── frontend/                  # Next.js 14 Frontend Application
-    ├── src/
-    │   ├── app/
-    │   │   ├── layout.tsx         # Navbar + Sidebar root layout
-    │   │   └── finance/page.tsx   # Task 1: Finance Dashboard 1
-    │   ├── components/
-    │   │   ├── layout/            # Top Navbar, Sidebar navigation
-    │   │   └── finance/           # Metric cards, Spline area chart, Donut chart, Breakdowns table
-    │   ├── data/                  # Mock dataset matching Figma specifications
-    │   └── types/                 # TypeScript interfaces for all financial entities
-    └── package.json
-```
+## Where each module lives
 
----
+| Module | Front-end URL | Front-end code | API |
+|---|---|---|---|
+| Public landing page (approved listings) | `/`, `/listings/:id` | `app/(public)` | `/api/v1/public/listings` |
+| Sign in / set password | `/login`, `/set-password` | `app/(finance)/login`, `app/(public)/set-password` | `/api/v1/auth/*` |
+| Finance, payments, management, agents directory, agent portal | `/finance`, `/payments`, `/management`, `/agents`, `/agent-portal` … | `app/(finance)` | `routes/api/finance.php` |
+| Admin app | `/admin/*` | `app/(admin)/admin` | `routes/api/admin.php` |
+| Listing approval queue (admin) | `/admin/listings` | `app/(admin)/admin/listings` | `/api/v1/admin/listings` |
+| Security app | `/security/*` | `app/(security)/security` | none yet |
+| Store module | `/store-app/*` | `app/(store)/store-app` | `routes/api/store.php` |
 
-## Implemented Tasks
+Each module keeps its own root layout through a Next.js route group, so its CSS and shell do not leak into the others.
 
-- [x] **Task 1: Build finance dashboard - Finance Dashboard 1**
-  - LincolnEstate Admin layout with brand green palette (`#10B981`)
-  - 6 Financial Metric KPI cards (Total Revenue, Monthly Rev, Yearly Rev, Outstanding, Total Paid, Total Owing)
-  - Interactive Revenue History spline line chart with gradient fill and yearly selector
-  - Revenue by Service multi-color donut chart with custom legend
-  - Revenue Breakdowns table with progress bars, status highlights, and eye-action modal trigger
-  - Matching Laravel API controller endpoint `GET /api/v1/finance/overview`
+## Roles
 
----
+`super_admin, admin, manager, security, resident, staff, agent, maintenance, store_owner`.
+The admin app writes `users.role`; an observer mirrors it into Spatie roles. Admin creates every account except residents
+(residents come from the Google Form import). Set `ESTATE_ENFORCE_AUTH=true` to require login and role on the finance,
+admin and store API groups (off by default because the existing screens do not send the token yet).
 
-## Getting Started
+## Agent listings flow
 
-### 1. Frontend (Next.js)
-```bash
-cd frontend
-npm install
-npm run dev
-```
-Open [http://localhost:3000](http://localhost:3000). It opens the **Sign In** page.
-
-There is no login API yet, so sign-in is a front-end placeholder: any valid-looking email and a password of 6+ characters work.
-Pick a role in **Login as**:
-
-| Role | Lands on |
-|------|----------|
-| Admin / Security | `/management` (admin dashboard, Finance, **Agents** directory at `/agents`) |
-| Agent | `/agent-portal` (the agent's own dashboard: listings, client requests, viewings, earnings) |
-| User | `/finance` |
-
-Admin pages need a signed-in session, and agents are sent to their own portal. Agent and portal changes are saved in the
-browser (localStorage); use **Reset sample data** at the bottom of those pages to restore the demo data.
-
-### 2. Backend (Laravel API)
-```bash
-cd backend
-composer install
-php artisan serve
-```
-The API is available at `http://localhost:8000/api/v1/finance/overview`.
+Agent submits a listing (`/agent-portal`) → status `pending` → admin approves in `/admin/listings` → it appears on `/`.
+Editing a listing sends it back to `pending`. Marking rented or sold does not.
