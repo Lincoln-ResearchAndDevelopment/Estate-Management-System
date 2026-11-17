@@ -25,7 +25,13 @@ export interface Listing {
   listedOn: string; // ISO date
   views: number;
   inquiries: number;
+  /** Admin review state. Only approved listings appear on the public landing page. */
+  approval?: ApprovalStatus;
+  listingType?: ListingKind;
 }
+
+export type ApprovalStatus = "pending" | "approved" | "rejected";
+export type ListingKind = "rent" | "sale" | "other";
 
 export type RequestStatus = "New" | "Contacted" | "Viewing Booked" | "Closed";
 
@@ -70,6 +76,7 @@ export interface NewListingInput {
   beds: number;
   baths: number;
   rentPerYear: number;
+  listingType?: ListingKind;
 }
 
 /** Agency fee the agent earns on a let, as a share of the first year's rent. */

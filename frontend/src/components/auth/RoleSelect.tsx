@@ -3,8 +3,8 @@
 import React, { useEffect, useId, useRef, useState } from "react";
 import { ChevronDown, Check } from "lucide-react";
 
-export type LoginRole = "Admin" | "Agent" | "User" | "Security";
-export const LOGIN_ROLES: LoginRole[] = ["Admin", "Agent", "User", "Security"];
+export type LoginRole = "Admin" | "Agent" | "User" | "Security" | "Store Owner";
+export const LOGIN_ROLES: LoginRole[] = ["Admin", "Agent", "User", "Security", "Store Owner"];
 
 interface RoleSelectProps {
   value: LoginRole | null;

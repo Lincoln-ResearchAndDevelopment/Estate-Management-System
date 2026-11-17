@@ -126,6 +126,11 @@ export function ListingsSection({ listings, onStatusChange, onAdd }: ListingsSec
             >
               <div className={`relative flex h-28 items-center justify-center bg-gradient-to-br ${TONES[i % TONES.length]}`}>
                 <Home className="h-10 w-10 text-white/80" strokeWidth={1.5} />
+                {l.approval && l.approval !== "approved" && (
+                  <span className={`absolute right-3 top-3 rounded-full px-2.5 py-1 text-[10px] font-bold ${l.approval === "pending" ? "bg-amber-100 text-amber-800" : "bg-rose-100 text-rose-800"}`}>
+                    {l.approval === "pending" ? "Awaiting approval" : "Rejected"}
+                  </span>
+                )}
                 <span className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[10px] font-bold ${statusPill[l.status]}`}>
                   {l.status}
                 </span>

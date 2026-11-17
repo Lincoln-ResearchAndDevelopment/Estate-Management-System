@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { Home, X } from "lucide-react";
 import { AGENT_ZONES } from "@/types/agent";
-import { NewListingInput, PROPERTY_TYPES } from "@/types/agentPortal";
+import { ListingKind, NewListingInput, PROPERTY_TYPES } from "@/types/agentPortal";
 import { useOverlay } from "@/components/agents/useOverlay";
 
 interface AddListingModalProps {
@@ -20,6 +20,7 @@ interface FormState {
   beds: string;
   baths: string;
   rent: string;
+  listingType: ListingKind;
 }
 
 const EMPTY: FormState = {
@@ -30,6 +31,7 @@ const EMPTY: FormState = {
   beds: "2",
   baths: "2",
   rent: "",
+  listingType: "rent",
 };
 
 type Errors = Partial<Record<keyof FormState, string>>;
@@ -84,6 +86,7 @@ export function AddListingModal({ isOpen, onClose, onCreate }: AddListingModalPr
       beds: Number(form.beds),
       baths: Number(form.baths),
       rentPerYear: Number(form.rent.replace(/[,\s]/g, "")),
+      listingType: form.listingType,
     });
   };
 
@@ -105,7 +108,7 @@ export function AddListingModal({ isOpen, onClose, onCreate }: AddListingModalPr
             </div>
             <div>
               <h3 id="add-listing-title" className="text-base font-bold text-slate-800">Add a Listing</h3>
-              <p className="text-xs font-medium text-slate-500">It goes live as “Available”.</p>
+              <p className="text-xs font-medium text-slate-500">It is sent to the estate admin for approval before it appears on the public page.</p>
             </div>
           </div>
           <button type="button" onClick={onClose} aria-label="Close" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
@@ -116,6 +119,14 @@ export function AddListingModal({ isOpen, onClose, onCreate }: AddListingModalPr
         <form onSubmit={submit} noValidate className="space-y-4 p-5 sm:p-6">
           <Field label="Title" htmlFor="l-title" error={errors.title}>
             <input id="l-title" autoFocus value={form.title} onChange={(e) => update("title", e.target.value)} placeholder="e.g. 3-Bed Terrace, Pool View" className={cls("title")} />
+          </Field>
+
+          <Field label="Listing for" htmlFor="l-kind">
+            <select id="l-kind" value={form.listingType} onChange={(e) => update("listingType", e.target.value as ListingKind)} className={cls("listingType")}>
+              <option value="rent">Rent</option>
+              <option value="sale">Sale</option>
+              <option value="other">Other property</option>
+            </select>
           </Field>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -142,7 +153,7 @@ export function AddListingModal({ isOpen, onClose, onCreate }: AddListingModalPr
             <Field label="Bathrooms" htmlFor="l-baths" error={errors.baths}>
               <input id="l-baths" type="number" min={1} max={12} value={form.baths} onChange={(e) => update("baths", e.target.value)} className={cls("baths")} />
             </Field>
-            <Field label="Rent / year (₦)" htmlFor="l-rent" error={errors.rent}>
+            <Field label={form.listingType === "rent" ? "Rent / year (₦)" : "Price (₦)"} htmlFor="l-rent" error={errors.rent}>
               <input id="l-rent" inputMode="numeric" value={form.rent} onChange={(e) => update("rent", e.target.value)} placeholder="3,500,000" className={cls("rent")} />
             </Field>
           </div>
@@ -152,7 +163,7 @@ export function AddListingModal({ isOpen, onClose, onCreate }: AddListingModalPr
               Cancel
             </button>
             <button type="submit" className="rounded-xl bg-primary px-5 py-2.5 text-xs font-bold text-white shadow-sm shadow-primary/25 hover:bg-primary-hover">
-              Publish Listing
+              Submit for approval
             </button>
           </div>
         </form>
