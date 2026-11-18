@@ -17,13 +17,13 @@ export interface StaffMember {
 
 export interface StaffMetrics {
   total_staff: number;
-  total_trend: string; // e.g. '+4%'
+  total_trend?: string;
   active: number;
   active_pct: string; // e.g. '95%'
   suspended: number;
-  suspended_diff: string; // e.g. '-2'
+  suspended_diff?: string;
   new_joining: number;
-  new_joining_badge: string; // e.g. 'New'
+  new_joining_badge?: string;
 }
 
 export interface StaffActivityItem {
@@ -85,14 +85,14 @@ export interface DepartmentBarItem {
 }
 
 export interface DepartmentAnalyticsData {
-  retention_rate: string; // e.g. '94.2%'
-  avg_tenure: string;     // e.g. '3.4 Yrs'
-  hiring_target: string;  // e.g. '82%'
+  retention_rate?: string; // only shown when the backend can compute it
+  avg_tenure?: string;
+  hiring_target?: string;
   departments: DepartmentBarItem[];
-  goal: {
-    title: string;        // 'Performance Goal'
-    subtitle: string;     // 'Q3 Operational Excellence'
-    achieved_pct: number; // 78
+  goal?: {
+    title: string;
+    subtitle: string;
+    achieved_pct: number;
   };
 }
 

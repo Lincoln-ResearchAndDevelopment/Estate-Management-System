@@ -53,6 +53,7 @@ export function DepartmentOverviewCard({ analytics }: DepartmentOverviewCardProp
 
         {/* Right: Retention Rate, Avg Tenure, Hiring Target */}
         <div className="sm:col-span-5 sm:border-l sm:border-border/80 sm:pl-6 space-y-4">
+          {analytics.retention_rate && (
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs sm:text-sm text-muted font-medium">
               Retention Rate
@@ -61,7 +62,9 @@ export function DepartmentOverviewCard({ analytics }: DepartmentOverviewCardProp
               {analytics.retention_rate}
             </span>
           </div>
+          )}
 
+          {analytics.avg_tenure && (
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs sm:text-sm text-muted font-medium">
               Avg Tenure
@@ -70,7 +73,9 @@ export function DepartmentOverviewCard({ analytics }: DepartmentOverviewCardProp
               {analytics.avg_tenure}
             </span>
           </div>
+          )}
 
+          {analytics.hiring_target && (
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs sm:text-sm text-muted font-medium">
               Hiring Target
@@ -79,6 +84,7 @@ export function DepartmentOverviewCard({ analytics }: DepartmentOverviewCardProp
               {analytics.hiring_target}
             </span>
           </div>
+          )}
         </div>
       </div>
     </div>

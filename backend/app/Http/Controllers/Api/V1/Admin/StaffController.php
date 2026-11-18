@@ -26,33 +26,25 @@ class StaffController extends Controller
             ->count();
         $newJoining = User::where('status', 'pending')->count();
 
+        $staffRoles = ['admin', 'super_admin', 'staff', 'manager', 'agent', 'maintenance', 'security', 'counsel', 'lead'];
+        $byDept = User::whereIn('role', $staffRoles)->whereNotNull('department')
+            ->selectRaw('department, count(*) as c')->groupBy('department')->orderByDesc('c')->get();
+
         return response()->json([
             'status' => 'success',
             'data' => [
                 'total_staff' => $totalStaff,
-                'total_trend' => '+4%',
                 'active' => $activeStaff,
-                'active_pct' => '95%',
+                'active_pct' => $totalStaff > 0 ? round($activeStaff / $totalStaff * 100).'%' : '0%',
                 'suspended' => $suspendedStaff,
-                'suspended_diff' => '-2',
                 'new_joining' => $newJoining,
-                'new_joining_badge' => 'New',
                 'department_overview' => [
-                    'retention_rate' => '94.2%',
-                    'avg_tenure' => '3.4 Yrs',
-                    'hiring_target' => '82%',
-                    'departments' => [
-                        ['code' => 'OPS', 'label' => 'Leasing & Ops', 'count' => 52, 'percentage' => 86],
-                        ['code' => 'FIN', 'label' => 'Finance', 'count' => 28, 'percentage' => 64],
-                        ['code' => 'MAINT', 'label' => 'Maintenance', 'count' => 38, 'percentage' => 76],
-                        ['code' => 'LEGAL', 'label' => 'Legal', 'count' => 18, 'percentage' => 48],
-                        ['code' => 'HR', 'label' => 'Human Resources', 'count' => 16, 'percentage' => 42],
-                    ],
-                    'goal' => [
-                        'title' => 'Performance Goal',
-                        'subtitle' => 'Q3 Operational Excellence',
-                        'achieved_pct' => 78,
-                    ],
+                    'departments' => $byDept->map(fn ($d) => [
+                        'code' => strtoupper(substr(preg_replace('/[^A-Za-z]/', '', $d->department), 0, 5)),
+                        'label' => $d->department,
+                        'count' => (int) $d->c,
+                        'percentage' => $totalStaff > 0 ? (int) round($d->c / $totalStaff * 100) : 0,
+                    ])->values(),
                 ],
             ],
         ]);
@@ -194,7 +186,7 @@ class StaffController extends Controller
             'department' => 'nullable|string|max:100',
             'staff_id' => 'nullable|string|max:50',
             'employment_type' => ['nullable', Rule::in(['full_time', 'contract'])],
-            'status' => ['nullable', Rule::in(['active', 'suspended', 'pending', 'inactive'])],
+            'status' => ['nullable', Rule::in(['active', 'suspended', 'pending', 'inactive', 'on_leave'])],
             'avatar_url' => 'nullable|string',
         ]);
 
@@ -244,7 +236,7 @@ class StaffController extends Controller
             'role' => 'nullable|string|max:50',
             'department' => 'nullable|string|max:100',
             'staff_id' => 'nullable|string|max:50',
-            'status' => ['sometimes', Rule::in(['active', 'suspended', 'pending', 'inactive'])],
+            'status' => ['sometimes', Rule::in(['active', 'suspended', 'pending', 'inactive', 'on_leave'])],
             'avatar_url' => 'nullable|string',
         ]);
 
