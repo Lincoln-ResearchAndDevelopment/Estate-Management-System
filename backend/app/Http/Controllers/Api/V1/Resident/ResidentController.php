@@ -37,8 +37,8 @@ class ResidentController extends Controller
         $neighbors = User::where('role', 'resident')->where('id', '!=', $u->id)
             ->when($block, fn ($q) => $q->where('unit_number', 'like', $block.'%'))->count();
 
-        // finance tables store resident_id as a string
-        $paid = DB::table('payments')->where('resident_id', (string) $u->id)->where('status', 'success')->sum('amount');
+        // total of successful payments (stored in kobo)
+        $paid = \App\Models\Payment::where('user_id', $u->id)->where('status', 'success')->sum('amount_kobo') / 100;
 
         return $this->ok([
             'neighbors' => $neighbors,

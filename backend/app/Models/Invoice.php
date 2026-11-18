@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class Invoice extends Model
 {
+    protected $table = 'fin_invoices';
+
     protected $fillable = [
         'user_id', 'service_charge_id', 'service_name', 'reference', 'amount_kobo', 'paid_kobo',
         'issued_on', 'due_date', 'period_start', 'period_end', 'last_reminded_at',

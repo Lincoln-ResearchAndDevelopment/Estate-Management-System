@@ -35,7 +35,7 @@ class OutstandingPaymentController extends Controller
         match ($request->query('sort_by', 'due_date')) {
             'amount' => $q->orderByRaw('(amount_kobo - paid_kobo) desc'),
             'days_overdue' => $q->orderBy('due_date'),
-            'name' => $q->orderBy(\App\Models\User::select('name')->whereColumn('users.id', 'invoices.user_id')),
+            'name' => $q->orderBy(\App\Models\User::select('name')->whereColumn('users.id', 'fin_invoices.user_id')),
             default => $q->orderBy('due_date'),
         };
 
