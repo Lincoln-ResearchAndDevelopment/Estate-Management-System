@@ -1,5 +1,7 @@
 "use client";
 
+import { storeFetch } from "../lib/api";
+
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -113,7 +115,7 @@ type DashboardData = {
     amount: string;
     dueDate: string;
     overdueDays: number;
-  };
+  } | null;
   nextBillingDate: string;
 };
 
@@ -278,30 +280,12 @@ export default function StoreDashboard() {
       setLoadError(null);
 
       try {
-        const dashboardUrl = new URL("/api/store/dashboard", window.location.origin);
-
-        if (new URLSearchParams(window.location.search).get("preview") === "1") {
-          dashboardUrl.searchParams.set("preview", "1");
-        }
-
-        const response = await fetch(dashboardUrl, {
-          cache: "no-store",
-          signal: controller.signal,
-        });
-        const result: {
-          data?: DashboardData;
-          error?: string;
-          preview?: boolean;
-        } =
-          await response.json();
-
-        if (!response.ok) {
-          throw new Error(result.error ?? "The store dashboard could not load.");
-        }
-
-        if (!result.data) {
+        const data = await storeFetch<DashboardData>("/store/owner-dashboard");
+        if (!data) {
           throw new Error("The dashboard API returned no dashboard data.");
         }
+        const result = { data, preview: false };
+        void controller;
 
         setDashboard(result.data);
         setIsPreview(result.preview === true);
@@ -350,7 +334,7 @@ export default function StoreDashboard() {
     setDialog({ title, description, action });
   }
 
-  const reminderMessage = dashboard
+  const reminderMessage = dashboard?.urgentAction
     ? `Hello, this is a reminder that ${dashboard.urgentAction.title} of ${formatCurrency(dashboard.urgentAction.amount)} was due on ${formatDate(dashboard.urgentAction.dueDate)}. Please complete payment at your earliest convenience.`
     : "Please review your overdue store invoice and complete payment at your earliest convenience.";
 
@@ -522,7 +506,7 @@ export default function StoreDashboard() {
                 onClick={() =>
                   openDialog(
                     "Send payment reminder",
-                    `Copy a reminder for ${dashboard?.urgentAction.title ?? "your overdue invoice"} and send it through your usual customer channel.`,
+                    `Copy a reminder for ${dashboard?.urgentAction?.title ?? "your overdue invoice"} and send it through your usual customer channel.`,
                   )
                 }
                 type="button"
@@ -721,20 +705,21 @@ export default function StoreDashboard() {
                   </div>
                 </section>
 
+                {dashboard.urgentAction ? (
                 <section className="panel urgent-panel">
                   <h2>Urgent Actions</h2>
                   <div className="urgent-card">
                     <div className="urgent-title-row">
-                      <strong>{dashboard.urgentAction.title}</strong>
+                      <strong>{dashboard.urgentAction!.title}</strong>
                       <strong className="urgent-amount">
-                        {formatCurrency(dashboard.urgentAction.amount)}
+                        {formatCurrency(dashboard.urgentAction!.amount)}
                       </strong>
                     </div>
-                    <p>Due: {formatDate(dashboard.urgentAction.dueDate)}</p>
+                    <p>Due: {formatDate(dashboard.urgentAction!.dueDate)}</p>
                     <div className="urgent-footer">
                       <span>
                         <Icon name="warning" size={13} />
-                        {dashboard.urgentAction.overdueDays} Days Overdue
+                        {dashboard.urgentAction!.overdueDays} Days Overdue
                       </span>
                       <button
                         className="button button--danger"
@@ -766,6 +751,9 @@ export default function StoreDashboard() {
                     </span>
                   </div>
                 </section>
+                ) : (
+                  <section className="panel urgent-panel"><h2>Urgent Actions</h2><p>No unpaid invoices.</p></section>
+                )}
               </div>
 
               <div className="summary-grid">
