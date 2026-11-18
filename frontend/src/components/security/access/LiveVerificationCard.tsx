@@ -6,7 +6,7 @@ import { cn } from "@/lib/security/utils";
 interface Props {
   personName: string;
   personRole: string;
-  matchScore: number;
+  matchScore?: number; // only when a biometric device reports one
   verificationType: string;
   gateLocation: string;
   verified: boolean;
@@ -28,12 +28,14 @@ export default function LiveVerificationCard({
           <span className="w-2 h-2 rounded-full bg-[--color-success] animate-pulse" />
           <span className="text-xs font-bold text-[--color-text] uppercase tracking-wide">Live Verification</span>
         </div>
-        <span className={cn(
-          "text-xs font-bold px-2 py-0.5 rounded-full",
-          verified ? "bg-[--color-success-light] text-[--color-success]" : "bg-[--color-danger-light] text-[--color-danger]"
-        )}>
-          MATCH {matchScore}%
-        </span>
+        {matchScore !== undefined && (
+          <span className={cn(
+            "text-xs font-bold px-2 py-0.5 rounded-full",
+            verified ? "bg-[--color-success-light] text-[--color-success]" : "bg-[--color-danger-light] text-[--color-danger]"
+          )}>
+            MATCH {matchScore}%
+          </span>
+        )}
       </div>
 
       {/* Face scan */}

@@ -2,6 +2,9 @@
 
 return [
     // Roles recognised by the system. `users.role` (admin module) is mirrored to Spatie roles.
+    // JSON list, e.g. ESTATE_EMERGENCY_CONTACTS='[{"name":"Estate Security Post","number":"+234..."}]'
+    'emergency_contacts' => json_decode((string) env('ESTATE_EMERGENCY_CONTACTS', '[]'), true) ?: [],
+
     'roles' => ['super_admin', 'admin', 'manager', 'security', 'resident', 'staff', 'agent', 'maintenance', 'store_owner'],
 
     // Roles an admin may create from the Admin app. Residents are imported from the onboarding form.

@@ -1,64 +1,43 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { securityFetch } from "@/lib/security/api";
 import { Filter, Download, MapPin } from "lucide-react";
 import ActiveAlertCard, { type ActiveAlertData } from "@/components/security/emergency/ActiveAlertCard";
 import EmergencyHistoryTable, { type HistoryRow } from "@/components/security/emergency/EmergencyHistoryTable";
 import EmergencyReportPanel from "@/components/security/emergency/EmergencyReportPanel";
 
-// ── mock data ──────────────────────────────────────────────────────────────
-const ACTIVE_ALERTS: ActiveAlertData[] = [
-  {
-    id: "1",
-    variant: "primary",
-    severity: "CRITICAL",
-    title: "Life Under Threat",
-    location: "Villa 402-B",
-    section: "Section: Highland Crest",
-    detail: "Unauthorized entry reported via panic button.",
-    resident: "Dr. Helena Vane",
-    timeElapsed: "04m 15s",
-    dispatched: "Alpha Squad",
-    eta: "ETA 2m",
-  },
-  {
-    id: "2",
-    variant: "secondary",
-    severity: "MEDICAL",
-    title: "Medical Assistance Req.",
-    location: "Villa 12-A (Clubside)",
-    section: "",
-    detail: "",
-    resident: "Marcus Thorne",
-    timeElapsed: "08:42 AM",
-    dispatched: "Medic Unit",
-    status: "Medic En Route",
-  },
-];
-
-const HISTORY: HistoryRow[] = [
-  { id: "1", date: "Oct 24, 2023", time: "02:15 AM", alertType: "Fire Alarm",          resident: "Sarah Jenkins",   location: "Villa 88-C",      status: "Resolved"     },
-  { id: "2", date: "Oct 23, 2023", time: "11:45 PM", alertType: "Intrusion Sensor",    resident: "System Trigger",  location: "Perimeter Zone 2",status: "Investigating" },
-  { id: "3", date: "Oct 23, 2023", time: "09:30 PM", alertType: "Medical",             resident: "Arthur Pendragon",location: "Villa 120-A",     status: "Resolved"     },
-  { id: "4", date: "Oct 23, 2023", time: "04:12 PM", alertType: "Suspicious Activity", resident: "Guard Observation",location: "North Entrance",  status: "Pending"      },
-];
-
-const CONTACTS = [
-  { name: "Estate Security Post", number: "+234 801 234 5678" },
-  { name: "Local Police (SAPS)",  number: "+234 802 345 6789" },
-];
-// ──────────────────────────────────────────────────────────────────────────
+interface EmergencyData {
+  active: ActiveAlertData[];
+  history: HistoryRow[];
+  total: number;
+  contacts: { name: string; number: string }[];
+}
 
 export default function EmergencyAlertsPage() {
-  const [alerts, setAlerts] = useState(ACTIVE_ALERTS);
+  const [data, setData] = useState<EmergencyData>({ active: [], history: [], total: 0, contacts: [] });
+  const [error, setError] = useState<string | null>(null);
   const [mapOpen, setMapOpen] = useState(false);
+  const alerts = data.active;
 
-  function handleResolve(id: string) {
-    setAlerts((prev) => prev.filter((a) => a.id !== id));
+  const load = useCallback(async () => {
+    try { setData(await securityFetch<EmergencyData>("/security/emergency")); setError(null); }
+    catch (e) { setError(e instanceof Error ? e.message : "Could not load alerts."); }
+  }, []);
+  useEffect(() => {
+    void load();
+    const t = setInterval(load, 10000); // new panic alerts show up within seconds
+    return () => clearInterval(t);
+  }, [load]);
+
+  async function handleResolve(id: string) {
+    try { await securityFetch(`/alerts/${id}/resolve`, { method: "POST" }); await load(); }
+    catch (e) { setError(e instanceof Error ? e.message : "Could not resolve the alert."); }
   }
 
   return (
     <div className="flex flex-col gap-5">
+      {error && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</div>}
       {/* Page header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
@@ -107,12 +86,12 @@ export default function EmergencyAlertsPage() {
           </div>
 
           {/* History table */}
-          <EmergencyHistoryTable rows={HISTORY} total={124} />
+          <EmergencyHistoryTable rows={data.history} total={data.total} />
         </div>
 
         {/* Right: report panel + tactical map toggle */}
         <div className="flex flex-col gap-5">
-          <EmergencyReportPanel contacts={CONTACTS} />
+          <EmergencyReportPanel contacts={data.contacts} />
 
           {/* Live tactical map */}
           <div className="bg-white rounded-xl border border-[--color-border] overflow-hidden">
