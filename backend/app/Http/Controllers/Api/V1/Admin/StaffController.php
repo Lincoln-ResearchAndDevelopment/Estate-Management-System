@@ -29,13 +29,13 @@ class StaffController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => [
-                'total_staff' => $totalStaff > 0 ? $totalStaff : 124,
+                'total_staff' => $totalStaff,
                 'total_trend' => '+4%',
-                'active' => $activeStaff > 0 ? $activeStaff : 118,
+                'active' => $activeStaff,
                 'active_pct' => '95%',
-                'suspended' => $suspendedStaff > 0 ? $suspendedStaff : 4,
+                'suspended' => $suspendedStaff,
                 'suspended_diff' => '-2',
-                'new_joining' => $newJoining > 0 ? $newJoining : 2,
+                'new_joining' => $newJoining,
                 'new_joining_badge' => 'New',
                 'department_overview' => [
                     'retention_rate' => '94.2%',

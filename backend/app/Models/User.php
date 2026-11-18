@@ -22,6 +22,7 @@ class User extends Authenticatable
         'job_title',
         'department',
         'unit_number',
+        'moved_in_at',
         'avatar_url',
         'requested_at',
         'password',
