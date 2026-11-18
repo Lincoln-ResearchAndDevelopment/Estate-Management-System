@@ -7,7 +7,7 @@ import { cn } from "@/lib/security/utils";
 interface Props {
   open: boolean;
   onClose: () => void;
-  onSubmit?: (data: BlacklistFormData) => void;
+  onSubmit?: (data: BlacklistFormData) => void | Promise<void>;
 }
 
 interface BlacklistFormData {

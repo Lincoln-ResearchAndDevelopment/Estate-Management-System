@@ -1,114 +1,48 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { securityFetch } from "@/lib/security/api";
 import { Search, Filter, Plus, UserX } from "lucide-react";
 import BlacklistStatCards from "@/components/security/blacklist/BlacklistStatCards";
 import BlacklistTable, { type BlacklistEntry } from "@/components/security/blacklist/BlacklistTable";
 import WatchlistAccounts, { type WatchlistAccount } from "@/components/security/blacklist/WatchlistAccounts";
 import AddToBlacklistDrawer from "@/components/security/blacklist/AddToBlacklistDrawer";
 
-// ── mock data ──────────────────────────────────────────────────────────────
-const ENTRIES: BlacklistEntry[] = [
-  {
-    id: "1",
-    name: "Julian Vance",
-    entityId: "ID: LE-99101-X",
-    reason: "Repeated Trespass",
-    reasonDetail: "Active warrant (City PD)",
-    riskLevel: "EXTREME",
-    status: "RESTRICTED",
-    lastAttemptedDate: "May 12, 2024",
-    lastAttemptedTime: "22:15",
-    lastAttemptedLocation: "North Pedestrian Gate",
-  },
-  {
-    id: "2",
-    name: "Elena Rodriguez",
-    entityId: "ID: LE-22460-W",
-    reason: "Financial Fraud Suspect",
-    reasonDetail: "Previous delivery spoofing",
-    riskLevel: "ELEVATED",
-    status: "UNDER_OBSERVATION",
-    lastAttemptedDate: "Apr 29, 2024",
-    lastAttemptedTime: "08:42",
-    lastAttemptedLocation: "Main Security Entry",
-  },
-  {
-    id: "3",
-    name: "Marcus Thorne",
-    entityId: "ID: LE-10204-V",
-    reason: "Assault History",
-    reasonDetail: "Aggressive behaviour at Gate 4",
-    riskLevel: "EXTREME",
-    status: "RESTRICTED",
-    lastAttemptedDate: "June 02, 2024",
-    lastAttemptedTime: "14:10",
-    lastAttemptedLocation: "West Perimeter Wall",
-  },
-  {
-    id: "4",
-    name: "Leo Chen",
-    entityId: "ID: LE-09532-S",
-    reason: "Solicitation",
-    reasonDetail: "Door-to-door violations",
-    riskLevel: "LOW",
-    status: "UNDER_OBSERVATION",
-    lastAttemptedDate: "Mar 15, 2024",
-    lastAttemptedTime: "11:30",
-    lastAttemptedLocation: "Clubhouse Access",
-  },
-  {
-    id: "5",
-    name: "Walter Stern",
-    entityId: "ID: LE-56123-Z",
-    reason: "Harassment",
-    reasonDetail: "Reported by Estate Admin",
-    riskLevel: "ELEVATED",
-    status: "UNDER_OBSERVATION",
-    lastAttemptedDate: "May 30, 2024",
-    lastAttemptedTime: "16:45",
-    lastAttemptedLocation: "Main Administration Office",
-  },
-];
+interface BlacklistData {
+  entries: BlacklistEntry[];
+  watchlist: (BlacklistEntry & { entityType: string })[];
+  stats: { totalBlacklisted: number; highRiskAlerts: number; watchlistEntries: number; clearedRemoved: number };
+}
 
-const WATCHLIST: WatchlistAccount[] = [
-  {
-    id: "w1",
-    name: "Global Reach Corp.",
-    subtitle: "Suspicious Wire Activity",
-    type: "organisation",
-    riskLevel: "Level 3 (Amber)",
-    riskFactor: "Level 3 (Amber)",
-    linkedUnit: "Penthouse A-12",
-    action: "Review Ledger",
-  },
-  {
-    id: "w2",
-    name: "Unknown MAC Address",
-    subtitle: "Network Intrusion Attempt",
-    type: "network",
-    riskLevel: "Level 5 (Red)",
-    riskFactor: "Level 5 (Red)",
-    accessNode: "Security Wi-Fi 04",
-    action: "Isolate Port",
-  },
-  {
-    id: "w3",
-    name: "Plate: TX-992-K",
-    subtitle: "Frequent Slow Drive",
-    type: "vehicle",
-    riskLevel: "Level 1 (Grey)",
-    riskFactor: "Level 1 (Grey)",
-    vehicle: "Dark SUV (2022)",
-    action: "Track Movement",
-  },
-];
-// ──────────────────────────────────────────────────────────────────────────
+const RISK_LABEL: Record<string, string> = {
+  EXTREME: "Level 5 (Red)", HIGH: "Level 4 (Orange)", ELEVATED: "Level 3 (Amber)", MEDIUM: "Level 2 (Yellow)", LOW: "Level 1 (Grey)",
+};
+const WATCH_ACTION: Record<string, string> = { organisation: "Review Ledger", network: "Isolate Port", vehicle: "Track Movement", person: "Review Profile" };
+
+function toWatchlist(e: BlacklistData["watchlist"][number]): WatchlistAccount {
+  return {
+    id: e.id,
+    name: e.name,
+    subtitle: e.reason,
+    type: e.entityType as WatchlistAccount["type"],
+    riskLevel: (RISK_LABEL[e.riskLevel] ?? "Level 3 (Amber)") as WatchlistAccount["riskLevel"],
+    riskFactor: RISK_LABEL[e.riskLevel] ?? e.riskLevel,
+    action: (WATCH_ACTION[e.entityType] ?? "Review Profile") as WatchlistAccount["action"],
+  };
+}
 
 export default function BlacklistPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [entries, setEntries] = useState(ENTRIES);
+  const [data, setData] = useState<BlacklistData>({ entries: [], watchlist: [], stats: { totalBlacklisted: 0, highRiskAlerts: 0, watchlistEntries: 0, clearedRemoved: 0 } });
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const entries = data.entries;
+
+  const load = useCallback(async () => {
+    try { setData(await securityFetch<BlacklistData>("/security/blacklist")); setError(null); }
+    catch (e) { setError(e instanceof Error ? e.message : "Could not load the blacklist."); }
+  }, []);
+  useEffect(() => { void load(); }, [load]);
 
   const filtered = entries.filter(
     (e) =>
@@ -118,6 +52,7 @@ export default function BlacklistPage() {
 
   return (
     <div className="flex flex-col gap-5">
+      {error && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</div>}
       {/* Page header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
@@ -140,12 +75,7 @@ export default function BlacklistPage() {
       </div>
 
       {/* Stats */}
-      <BlacklistStatCards
-        totalBlacklisted={5}
-        highRiskAlerts={2}
-        watchlistEntries={3}
-        clearedRemoved={0}
-      />
+      <BlacklistStatCards {...data.stats} />
 
       {/* Search */}
       <div className="flex items-center gap-2 bg-white border border-[--color-border] rounded-lg px-3 py-2.5 w-full max-w-sm">
@@ -160,10 +90,10 @@ export default function BlacklistPage() {
       </div>
 
       {/* Table */}
-      <BlacklistTable entries={filtered} onViewProfile={(id) => console.log("View profile", id)} />
+      <BlacklistTable entries={filtered} onViewProfile={() => {}} />
 
       {/* Watchlist */}
-      <WatchlistAccounts accounts={WATCHLIST} />
+      <WatchlistAccounts accounts={data.watchlist.map(toWatchlist)} />
 
       {/* FAB */}
       <button
@@ -178,22 +108,19 @@ export default function BlacklistPage() {
       <AddToBlacklistDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        onSubmit={(data) => {
-          setEntries((prev) => [
-            {
-              id: String(Date.now()),
-              name: data.name,
-              entityId: data.entityId || "ID: TBD",
-              reason: data.reason,
-              reasonDetail: data.details,
-              riskLevel: data.riskLevel as BlacklistEntry["riskLevel"],
-              status: "RESTRICTED",
-              lastAttemptedDate: "—",
-              lastAttemptedTime: "—",
-              lastAttemptedLocation: "—",
-            },
-            ...prev,
-          ]);
+        onSubmit={async (f) => {
+          try {
+            await securityFetch("/security/blacklist", {
+              method: "POST",
+              body: JSON.stringify({
+                name: f.name, entity_ref: f.entityId || undefined, reason: f.reason, details: f.details || undefined,
+                risk_level: f.riskLevel, notify_officers: f.notifyOfficers,
+              }),
+            });
+            await load();
+          } catch (e) {
+            setError(e instanceof Error ? e.message : "Could not add the entry.");
+          }
         }}
       />
     </div>
