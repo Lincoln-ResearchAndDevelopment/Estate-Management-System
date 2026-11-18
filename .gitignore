@@ -5,3 +5,4 @@ node_modules/
 vendor/
 /backend/storage/*.key
 .DS_Store
+.env.staging
