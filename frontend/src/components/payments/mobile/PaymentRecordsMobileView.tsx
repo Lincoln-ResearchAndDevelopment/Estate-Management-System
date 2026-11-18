@@ -1,5 +1,6 @@
 "use client";
 
+import { useFinance } from "@/lib/finance/api";
 import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import {
@@ -21,52 +22,14 @@ interface MobilePaymentItem {
   iconType: "user" | "car" | "house" | "alert" | "wrench";
 }
 
-const initialMobilePayments: MobilePaymentItem[] = [
-  {
-    id: "1",
-    name: "Marcus Sterling",
-    purpose: "Maintenance Fee",
-    amount: "₦1,200.00",
-    status: "Paid",
-    iconType: "user",
-  },
-  {
-    id: "2",
-    name: "Elena Rodriguez",
-    purpose: "Parking Security",
-    amount: "₦450.00",
-    status: "Processing",
-    iconType: "car",
-  },
-  {
-    id: "3",
-    name: "Jonathan Wu",
-    purpose: "Clubhouse Rental",
-    amount: "₦2,800.00",
-    status: "Paid",
-    iconType: "house",
-  },
-  {
-    id: "4",
-    name: "Sarah Jenkins",
-    purpose: "Late Fee Penalty",
-    amount: "₦150.00",
-    status: "Default",
-    iconType: "alert",
-  },
-  {
-    id: "5",
-    name: "The Thompsons",
-    purpose: "Annual Renovation",
-    amount: "₦3,400.00",
-    status: "Paid",
-    iconType: "wrench",
-  },
-];
-
 export function PaymentRecordsMobileView() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [payments] = useState<MobilePaymentItem[]>(initialMobilePayments);
+  const { data: summary } = useFinance<{ metrics: { collectedToday: string; pendingActive: string }; recentPayments: MobilePaymentItem[] }>(
+    "/payments/mobile-summary",
+    { metrics: { collectedToday: "₦0.00", pendingActive: "0 Active" }, recentPayments: [] },
+    (j) => j
+  );
+  const payments = summary.recentPayments;
 
   const filteredPayments = useMemo(() => {
     if (!searchQuery.trim()) return payments;
@@ -160,7 +123,7 @@ export function PaymentRecordsMobileView() {
             Collected Today
           </p>
           <p className="text-lg font-extrabold text-emerald-600 mt-1">
-            ₦12,450.00
+            {summary.metrics.collectedToday}
           </p>
         </div>
 
@@ -170,7 +133,7 @@ export function PaymentRecordsMobileView() {
             Pending
           </p>
           <p className="text-lg font-extrabold text-amber-700 mt-1">
-            14 Active
+            {summary.metrics.pendingActive}
           </p>
         </div>
       </div>

@@ -78,7 +78,7 @@ export function OutstandingMobileView({
               {/* Card Header */}
               <div className="flex items-start justify-between mb-3">
                 <Link
-                  href={`/outstanding/resident/${payment.id}`}
+                  href={`/outstanding/resident/${payment.residentId ?? payment.id}`}
                   className="flex items-center gap-3 group"
                 >
                   <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary/10">

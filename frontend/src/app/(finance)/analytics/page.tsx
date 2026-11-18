@@ -7,28 +7,29 @@ import { MonthlyRevenueTrendChart } from "@/components/analytics/MonthlyRevenueT
 import { AnalyticsServiceDonut } from "@/components/analytics/AnalyticsServiceDonut";
 import { YearlyRevenueBarChart } from "@/components/analytics/YearlyRevenueBarChart";
 import { CollectionStatusCard } from "@/components/analytics/CollectionStatusCard";
-import { mockPaymentAnalyticsData } from "@/data/mockAnalyticsData";
+import { ErrorBanner, useFinance } from "@/lib/finance/api";
+import type { PaymentAnalyticsData } from "@/types/analytics";
 
 const TIME_RANGES = ["This Month", "Last Quarter", "This Year"] as const;
 
 export default function PaymentAnalyticsPage() {
-  const [data] = useState(mockPaymentAnalyticsData);
+  const { data, error } = useFinance<{ data: PaymentAnalyticsData }, PaymentAnalyticsData>(
+    "/finance/analytics",
+    { kpis: [], monthlyRevenueTrend: [], revenueByService: [], yearlyRevenueTrend: [], collectionStatus: { statusLabel: "", collectionPercentage: 0, paidAmount: "₦0", paidPercentage: 0, outstandingAmount: "₦0", outstandingPercentage: 0 } } as PaymentAnalyticsData
+  );
   const [selectedRange, setSelectedRange] =
     useState<(typeof TIME_RANGES)[number]>("This Month");
-  const [exportNotice, setExportNotice] = useState(false);
 
   const cycleRange = () => {
     const idx = TIME_RANGES.indexOf(selectedRange);
     setSelectedRange(TIME_RANGES[(idx + 1) % TIME_RANGES.length]);
   };
 
-  const handleExport = () => {
-    setExportNotice(true);
-    setTimeout(() => setExportNotice(false), 3000);
-  };
+  const handleExport = () => window.print();
 
   return (
     <div className="space-y-6 pb-8">
+      <ErrorBanner message={error} />
       {/* 1. Page Header & Controls */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -62,16 +63,6 @@ export default function PaymentAnalyticsPage() {
           </button>
         </div>
       </div>
-
-      {/* Export Confirmation Banner */}
-      {exportNotice && (
-        <div className="flex items-center gap-2.5 rounded-2xl border border-accent/40 bg-accent/10 px-4 py-3 text-xs font-bold text-dark shadow-xs">
-          <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
-          <span>
-            Payment Analytics Report ({selectedRange}) exported successfully!
-          </span>
-        </div>
-      )}
 
       {/* 2. Top Row: 4 KPI Metric Cards */}
       <AnalyticsKpiCards cards={data.kpis} />

@@ -3,96 +3,97 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
+use App\Models\AppNotification;
+use App\Models\Invoice;
+use App\Services\Finance\Ledger;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class OutstandingPaymentController extends Controller
 {
-    /**
-     * GET /v1/payments/outstanding
-     *
-     * Returns a paginated list of outstanding (overdue, pending, partial) payments.
-     *
-     * Query parameters:
-     *   service_type  string  Filter by service type
-     *   status        string  Filter by status: overdue|pending|partial
-     *   sort_by       string  Sort column: due_date|amount|days_overdue|name (default: due_date)
-     *   per_page      int     Records per page (default: 15)
-     *   page          int     Page number (default: 1)
-     */
+    private function open()
+    {
+        return Invoice::with('user')->whereColumn('paid_kobo', '<', 'amount_kobo');
+    }
+
     public function index(Request $request): JsonResponse
     {
         $request->validate([
             'service_type' => 'nullable|string|max:100',
-            'status'       => 'nullable|in:overdue,pending,partial',
-            'sort_by'      => 'nullable|in:due_date,amount,days_overdue,name',
-            'per_page'     => 'nullable|integer|min:5|max:100',
+            'status' => 'nullable|in:overdue,pending,partial',
+            'sort_by' => 'nullable|in:due_date,amount,days_overdue,name',
+            'per_page' => 'nullable|integer|min:5|max:100',
         ]);
+        $today = now()->toDateString();
 
-        // TODO: Replace with real Eloquent query
-        // Example query shape:
-        //
-        // $query = Payment::query()
-        //     ->whereIn('status', ['overdue', 'pending', 'partial'])
-        //     ->with(['resident', 'property', 'service'])
-        //     ->when($request->service_type, fn($q, $v) => $q->whereHas('service', fn($s) => $s->where('name', $v)))
-        //     ->when($request->status, fn($q, $v) => $q->where('status', $v))
-        //     ->when($request->sort_by === 'amount', fn($q) => $q->orderByDesc('amount_due'))
-        //     ->when($request->sort_by === 'days_overdue', fn($q) => $q->orderByDesc('days_overdue'))
-        //     ->when($request->sort_by === 'name', fn($q) => $q->orderBy('residents.name'))
-        //     ->when(!$request->sort_by || $request->sort_by === 'due_date', fn($q) => $q->orderBy('due_date'))
-        //     ->paginate($request->per_page ?? 15);
+        $q = $this->open()
+            ->when($request->service_type, fn ($b, $v) => $b->where('service_name', $v))
+            ->when($request->status === 'overdue', fn ($b) => $b->where('due_date', '<', $today))
+            ->when($request->status === 'pending', fn ($b) => $b->where('due_date', '>=', $today)->where('paid_kobo', 0))
+            ->when($request->status === 'partial', fn ($b) => $b->where('due_date', '>=', $today)->where('paid_kobo', '>', 0));
 
+        match ($request->query('sort_by', 'due_date')) {
+            'amount' => $q->orderByRaw('(amount_kobo - paid_kobo) desc'),
+            'days_overdue' => $q->orderBy('due_date'),
+            'name' => $q->orderBy(\App\Models\User::select('name')->whereColumn('users.id', 'invoices.user_id')),
+            default => $q->orderBy('due_date'),
+        };
+
+        $page = $q->paginate((int) $request->query('per_page', 15));
+        $rows = collect($page->items())->map(function (Invoice $i) use ($today) {
+            $days = $i->due_date->lt(now()->startOfDay()) ? (int) $i->due_date->diffInDays(now()->startOfDay()) : 0;
+            return [
+                'id' => (string) $i->id,
+                'residentId' => (string) $i->user_id,
+                'residentName' => $i->user?->name ?? 'Unknown',
+                'propertyAddress' => $i->user?->unit_number ?? '-',
+                'serviceType' => $i->service_name,
+                'amountDue' => Ledger::naira($i->balanceKobo()),
+                'amountPaid' => Ledger::naira($i->paid_kobo),
+                'dueDate' => $i->due_date->format('M d, Y'),
+                'daysOverdue' => $days,
+                'status' => $days > 0 ? 'overdue' : ($i->paid_kobo > 0 ? 'partial' : 'pending'),
+                'invoiceNumber' => $i->reference,
+            ];
+        })->values();
+
+        $all = $this->open()->get();
         return response()->json([
-            'message' => 'Outstanding payments endpoint — connect to Eloquent query.',
-            'data'    => [],
+            'data' => $rows,
             'summary' => [
-                'total_outstanding' => 0,
-                'overdue_count'     => 0,
-                'pending_count'     => 0,
-                'partial_count'     => 0,
+                'totalOutstanding' => Ledger::naira((int) $all->sum(fn ($i) => $i->balanceKobo())),
+                'overdueCount' => $all->filter(fn ($i) => $i->state() === 'overdue')->count(),
+                'pendingCount' => $all->filter(fn ($i) => $i->state() === 'pending')->count(),
+                'partialCount' => $all->filter(fn ($i) => $i->state() === 'partial')->count(),
             ],
-            'meta' => [
-                'current_page' => 1,
-                'per_page'     => 15,
-                'total'        => 0,
-                'last_page'    => 1,
-            ],
+            'meta' => ['current_page' => $page->currentPage(), 'per_page' => $page->perPage(), 'total' => $page->total(), 'last_page' => $page->lastPage()],
         ]);
     }
 
-    /**
-     * POST /v1/payments/outstanding/{id}/remind
-     *
-     * Sends a payment reminder notification to a resident.
-     */
+    private function remind(Invoice $i): void
+    {
+        AppNotification::create([
+            'user_id' => $i->user_id, 'type' => 'system',
+            'title' => 'Payment reminder: '.$i->service_name,
+            'body' => '₦'.number_format($i->balanceKobo() / 100, 2).' due '.$i->due_date->format('M d, Y').' ('.$i->reference.')',
+            'data' => ['invoice' => $i->reference],
+        ]);
+        $i->update(['last_reminded_at' => now()]);
+    }
+
     public function sendReminder(string $id): JsonResponse
     {
-        // TODO: Find payment record, trigger notification (mail/SMS via queue)
-        // Example:
-        // $payment = Payment::findOrFail($id);
-        // $payment->resident->notify(new PaymentReminderNotification($payment));
-
-        return response()->json([
-            'message' => "Reminder sent for payment ID: {$id}",
-            'sent_at' => now()->toIso8601String(),
-        ]);
+        $invoice = Invoice::whereColumn('paid_kobo', '<', 'amount_kobo')->findOrFail($id);
+        $this->remind($invoice);
+        return response()->json(['message' => "Reminder sent to the resident for {$invoice->reference}.", 'sent_at' => now()->toIso8601String()]);
     }
 
-    /**
-     * POST /v1/payments/outstanding/remind-all
-     *
-     * Sends bulk reminders to all residents with outstanding payments.
-     */
     public function sendBulkReminders(Request $request): JsonResponse
     {
-        // TODO: Queue bulk notification job
-        // Example:
-        // dispatch(new SendBulkPaymentRemindersJob($request->status));
-
-        return response()->json([
-            'message'    => 'Bulk reminders queued successfully.',
-            'queued_at'  => now()->toIso8601String(),
-        ]);
+        $invoices = $this->open()->when($request->status === 'overdue', fn ($b) => $b->where('due_date', '<', now()->toDateString()))->get();
+        foreach ($invoices as $i) {
+            $this->remind($i);
+        }
+        return response()->json(['message' => "Reminders sent for {$invoices->count()} invoices.", 'count' => $invoices->count(), 'queued_at' => now()->toIso8601String()]);
     }
 }

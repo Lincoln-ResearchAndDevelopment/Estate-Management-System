@@ -8,10 +8,14 @@ import { MobileMetricCards } from "@/components/mobile/MobileMetricCards";
 import { MobileRevenueTrends } from "@/components/mobile/MobileRevenueTrends";
 import { MobileTransactionsList } from "@/components/mobile/MobileTransactionsList";
 import { MobileBottomNav } from "@/components/mobile/MobileBottomNav";
-import { mockMobileFinanceData } from "@/data/mockMobileFinanceData";
+import { ErrorBanner, useFinance } from "@/lib/finance/api";
+import type { MobileDashboardData } from "@/types/mobileFinance";
 
 export default function FinanceMobileDashboardPage() {
-  const data = mockMobileFinanceData;
+  const { data, error } = useFinance<{ data: MobileDashboardData }, MobileDashboardData>(
+    "/finance/mobile-overview",
+    { greetingName: "", metrics: [], trendMonths: [], recentTransactions: [] } as unknown as MobileDashboardData
+  );
 
   return (
     <div className="min-h-screen bg-slate-100/70 py-4 sm:py-8 flex flex-col items-center justify-start">
@@ -39,6 +43,7 @@ export default function FinanceMobileDashboardPage() {
         </div>
 
         {/* 1. Mobile Header */}
+        <ErrorBanner message={error} />
         <MobileHeader />
 
         {/* Mobile Scrollable Content Area */}

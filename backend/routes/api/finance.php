@@ -46,6 +46,7 @@ Route::prefix('v1')->group(function () {
     // Task 15: Resident Finance Summary
     Route::get('/residents/{id}/finance-summary', [ResidentFinanceController::class, 'show']);
     Route::post('/residents/{id}/record-payment', [ResidentFinanceController::class, 'recordPayment']);
+    Route::post('/finance/invoices/generate', [ResidentFinanceController::class, 'generateInvoices']);
 
     // Task 16: Payment Analytics
     Route::get('/finance/analytics', [AnalyticsController::class, 'index']);
