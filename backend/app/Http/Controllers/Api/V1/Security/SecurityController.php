@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api\V1\Security;
 
 use App\Http\Controllers\Controller;
+use App\Models\AccessLog;
 use App\Models\AppNotification;
+use App\Models\GuestPass;
 use App\Models\BlacklistEntry;
 use App\Models\EstateAlert;
 use App\Models\User;
@@ -146,5 +148,91 @@ class SecurityController extends Controller
         $entry = BlacklistEntry::findOrFail($id);
         $entry->update($d);
         return response()->json(['data' => $this->entryOut($entry)]);
+    }
+
+    // ---------------- access control ----------------
+    public function access(): JsonResponse
+    {
+        $logs = AccessLog::latest('occurred_at')->limit(50)->get();
+        $row = fn (AccessLog $l) => [
+            'id' => (string) $l->id,
+            'name' => $l->name,
+            'role' => $l->role_label ?? '',
+            'gateNo' => $l->gate,
+            'verificationType' => $l->verification_type,
+            'status' => $l->status,
+            'timestamp' => $l->occurred_at?->format('H:i:s'),
+        ];
+
+        $latestOk = AccessLog::whereIn('status', ['Authorised', 'Success'])->latest('occurred_at')->first();
+        $latestDenied = AccessLog::whereIn('status', ['Denied', 'Flagged'])->latest('occurred_at')->first();
+
+        // Entries per hour for the last 12 hours, scaled 0-100 for the bar chart.
+        $start = now()->subHours(11)->startOfHour();
+        $counts = array_fill(0, 12, 0);
+        AccessLog::where('occurred_at', '>=', $start)->pluck('occurred_at')->each(function ($t) use (&$counts, $start) {
+            $i = (int) floor($start->diffInHours($t));
+            if ($i >= 0 && $i < 12) { $counts[$i]++; }
+        });
+        $max = max(1, max($counts));
+        $bars = array_map(fn ($c) => ['height' => (int) round($c / $max * 100), 'active' => $c === $max && $c > 0], $counts);
+
+        $passes = GuestPass::where('status', 'active')->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))
+            ->latest('id')->limit(10)->get()->map(function (GuestPass $p) {
+                $mins = $p->expires_at ? (int) now()->diffInMinutes($p->expires_at, false) : null;
+                return [
+                    'id' => (string) $p->id,
+                    'name' => $p->name,
+                    'subtitle' => $mins !== null ? "Expiring in {$mins}m" : ($p->invited_by ? "Invited by {$p->invited_by}" : 'One-time entry'),
+                    'status' => $mins !== null && $mins <= 15 ? 'expiring' : 'cleared',
+                ];
+            });
+
+        return response()->json(['data' => [
+            'logs' => $logs->map($row)->values(),
+            'total' => AccessLog::count(),
+            'trafficBars' => $bars,
+            'entriesLast12h' => array_sum($counts),
+            'latestVerified' => $latestOk ? [
+                'name' => $latestOk->name, 'role' => $latestOk->role_label ?? '', 'verificationType' => $latestOk->verification_type,
+                'gate' => $latestOk->gate, 'time' => $latestOk->occurred_at?->format('H:i'),
+            ] : null,
+            'latestDenied' => $latestDenied ? [
+                'name' => $latestDenied->name, 'time' => $latestDenied->occurred_at?->format('H:i'),
+                'reason' => $latestDenied->failure_reason ?? $latestDenied->status, 'gate' => $latestDenied->gate,
+            ] : null,
+            'passes' => $passes->values(),
+        ]]);
+    }
+
+    public function logAccess(Request $r): JsonResponse
+    {
+        $d = $r->validate([
+            'name' => 'required|string|max:255',
+            'role_label' => 'nullable|string|max:255',
+            'gate' => 'required|string|max:120',
+            'verification_type' => ['required', Rule::in(['Face ID', 'QR Code', 'Manual', 'Biometric'])],
+            'status' => ['required', Rule::in(['Authorised', 'Success', 'Denied', 'Flagged'])],
+            'failure_reason' => 'nullable|string|max:255',
+            'user_id' => 'nullable|integer|exists:users,id',
+        ]);
+        $log = AccessLog::create($d + ['logged_by' => $r->user()->id, 'occurred_at' => now()]);
+        return response()->json(['data' => ['id' => $log->id]], 201);
+    }
+
+    public function createPass(Request $r): JsonResponse
+    {
+        $d = $r->validate([
+            'name' => 'required|string|max:255',
+            'invited_by' => 'nullable|string|max:120',
+            'expires_in_minutes' => 'nullable|integer|min:5|max:10080',
+        ]);
+        $pass = GuestPass::create([
+            'name' => $d['name'], 'invited_by' => $d['invited_by'] ?? null,
+            'kind' => isset($d['expires_in_minutes']) ? 'timed' : 'one_time',
+            'expires_at' => isset($d['expires_in_minutes']) ? now()->addMinutes($d['expires_in_minutes']) : null,
+            'created_by' => $r->user()->id,
+        ]);
+        return response()->json(['data' => ['id' => $pass->id]], 201);
     }
 }
