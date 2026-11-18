@@ -2,15 +2,15 @@
 
 import React, { useState } from "react";
 import { Bell, ShieldAlert } from "lucide-react";
-import {
-  initialLifeThreatAlerts,
-  TOTAL_LIFE_THREAT_ALERTS,
-} from "@/lib/admin/reportsData";
+import { useAdminReports } from "@/lib/admin/reportsApi";
 import { LifeThreatAlertItem } from "@/types/admin/reports";
 import { cn } from "@/lib/admin/utils";
 
 export function AdminReportTableView() {
-  const [alerts] = useState<LifeThreatAlertItem[]>(initialLifeThreatAlerts);
+  const { data: rd } = useAdminReports();
+  const alerts: LifeThreatAlertItem[] = rd.lifeThreatAlerts;
+  const TOTAL_LIFE_THREAT_ALERTS = rd.lifeThreatTotal;
+
   const [showAlertToast, setShowAlertToast] = useState(false);
 
   return (

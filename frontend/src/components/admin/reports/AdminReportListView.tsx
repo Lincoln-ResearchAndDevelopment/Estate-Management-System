@@ -2,14 +2,14 @@
 
 import React, { useState } from "react";
 import { FileText, X, Home, Calendar } from "lucide-react";
-import { initialIntelligenceReports } from "@/lib/admin/reportsData";
+import { useAdminReports } from "@/lib/admin/reportsApi";
 import { IntelligenceReportItem } from "@/types/admin/reports";
 import { cn } from "@/lib/admin/utils";
 
 export function AdminReportListView() {
-  const [reports] = useState<IntelligenceReportItem[]>(
-    initialIntelligenceReports
-  );
+  const { data: rd } = useAdminReports();
+  const reports: IntelligenceReportItem[] = rd.intelligenceReports;
+
   const [selectedReport, setSelectedReport] =
     useState<IntelligenceReportItem | null>(null);
 

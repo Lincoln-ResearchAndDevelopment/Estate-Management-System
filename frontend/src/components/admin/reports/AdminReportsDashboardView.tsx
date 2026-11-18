@@ -17,14 +17,7 @@ import {
   ListChecks,
   ChevronDownSquare,
 } from "lucide-react";
-import {
-  initialReportKpis,
-  monthlyRevenueTrendData,
-  serviceRevenueShares,
-  yearlyRevenueBars,
-  initialCollectionStatus,
-  initialDefaultersList,
-} from "@/lib/admin/reportsData";
+import { useAdminReports } from "@/lib/admin/reportsApi";
 import { ReportKpiMetric, ReportPeriod } from "@/types/admin/reports";
 import { MonthlyRevenueTrendCard } from "./MonthlyRevenueTrendCard";
 import { RevenueByServiceCard } from "./RevenueByServiceCard";
@@ -71,6 +64,14 @@ function KpiIconBadge({
 }
 
 export function AdminReportsDashboardView() {
+  const { data: rd, error: reportsError } = useAdminReports();
+  const initialReportKpis = rd.kpis;
+  const monthlyRevenueTrendData = rd.monthlyRevenue;
+  const serviceRevenueShares = rd.serviceShares;
+  const yearlyRevenueBars = rd.yearlyBars;
+  const initialCollectionStatus = rd.collection;
+  const initialDefaultersList = rd.defaulters;
+
   const [viewMode, setViewMode] = useState<
     "analytics" | "list" | "table" | "dropdown"
   >("analytics");
@@ -105,6 +106,9 @@ export function AdminReportsDashboardView() {
 
   return (
     <div className="space-y-5 animate-in fade-in duration-300 pb-8">
+      {reportsError && (
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-semibold text-red-700">{reportsError}</div>
+      )}
       {/* ================= REPORT SECTION SWITCHER (NO DUPLICATE MOBILE TAB) ================= */}
       <div className="flex items-center justify-between flex-wrap gap-3 bg-surface-card border border-border/70 rounded-2xl px-4 py-2.5 shadow-2xs">
         <div className="inline-flex items-center gap-1.5 p-1 rounded-xl bg-surface border border-border/70 flex-wrap">

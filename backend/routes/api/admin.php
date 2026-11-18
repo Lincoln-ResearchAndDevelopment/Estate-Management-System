@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\Admin\StaffController;
 use App\Http\Controllers\Api\V1\Admin\AccessController;
 use App\Http\Controllers\Api\V1\Admin\AwayController;
 use App\Http\Controllers\Api\V1\Admin\VehicleController;
+use App\Http\Controllers\Api\V1\Admin\ReportsController;
 
 /*
 |--------------------------------------------------------------------------
@@ -42,6 +43,7 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('users', UserController::class);
 
         // Check-in / check-out monitoring
+        Route::get('reports', [ReportsController::class, 'index']);
         Route::get('access', [AccessController::class, 'index']);
 
         // Away notifications

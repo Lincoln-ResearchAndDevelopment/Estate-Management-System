@@ -11,12 +11,7 @@ import {
   AlertTriangle,
   MoreVertical,
 } from "lucide-react";
-import {
-  mobileReportKpis,
-  mobileRevenueTrendBars,
-  mobileRevenueCategories,
-  mobileGeneratedReports,
-} from "@/lib/admin/reportsData";
+import { useAdminReports } from "@/lib/admin/reportsApi";
 import { MobileReportKpiItem } from "@/types/admin/reports";
 import { cn } from "@/lib/admin/utils";
 
@@ -50,6 +45,12 @@ function MobileKpiRightBadge({
 }
 
 export function AdminReportsMobileView() {
+  const { data: rd } = useAdminReports();
+  const mobileReportKpis = rd.mobileKpis;
+  const mobileRevenueTrendBars = rd.mobileTrendBars;
+  const mobileRevenueCategories = rd.mobileCategories;
+  const mobileGeneratedReports = rd.generatedReports;
+
   const [periodIdx, setPeriodIdx] = useState(0);
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const [showAllReports, setShowAllReports] = useState(false);
