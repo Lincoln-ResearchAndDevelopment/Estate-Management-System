@@ -4,7 +4,7 @@ import { cn } from "@/lib/security/utils";
 interface Props {
   urgentReports: number;
   resolvedToday: number;
-  activePatrols: number;
+  activePatrols?: number;
   pendingReview: number;
 }
 
@@ -22,12 +22,12 @@ export default function IntelStatCards({ urgentReports, resolvedToday, activePat
       icon: <CheckCircle className="w-5 h-5 text-[--color-success]" />,
       iconBg: "bg-[--color-success-light]",
     },
-    {
+    ...(activePatrols === undefined ? [] : [{
       label: "Active Patrols",
       value: String(activePatrols).padStart(2, "0"),
       icon: <Users className="w-5 h-5 text-[--color-primary]" />,
       iconBg: "bg-[--color-primary-light]",
-    },
+    }]),
     {
       label: "Pending Review",
       value: String(pendingReview).padStart(2, "0"),

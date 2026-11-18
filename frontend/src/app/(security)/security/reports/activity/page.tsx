@@ -3,37 +3,51 @@
 import { useState } from "react";
 import { Activity, Plus, X } from "lucide-react";
 import EstateActivityTable, { type ActivityRow } from "@/components/security/reports/EstateActivityTable";
+import { securityFetch } from "@/lib/security/api";
+import { SecurityError, useSecurityData } from "@/lib/security/useSecurity";
 
-// ── mock data ──────────────────────────────────────────────────────────────
-const BASE_ROWS: ActivityRow[] = [
-  { id: "1", name: "David Onyemenam", out: "8:30am", outWith: "Family", in: "6:45pm", inWith: "Alone" },
-  { id: "2", name: "David Onyemenam", out: "8:30am", outWith: "Family", in: "6:45pm", inWith: "Wife"  },
-  { id: "3", name: "David Onyemenam", out: "8:30am", outWith: "Family", in: "6:45pm", inWith: "Wife"  },
-  { id: "4", name: "David Onyemenam", out: "8:30am", outWith: "Family", in: "6:45pm", inWith: "Wife"  },
-  { id: "5", name: "David Onyemenam", out: "8:30am", outWith: "Family", in: "6:45pm", inWith: "Wife"  },
-  { id: "6", name: "David Onyemenam", out: "8:30am", outWith: "Family", in: "6:45pm", inWith: "Wife"  },
-  { id: "7", name: "David Onyemenam", out: "8:30am", outWith: "Family", in: "6:45pm", inWith: "Wife"  },
-];
-// ──────────────────────────────────────────────────────────────────────────
 
 export default function EstateActivityPage() {
-  const [rows, setRows]           = useState<ActivityRow[]>(BASE_ROWS);
+  const { data, error, reload } = useSecurityData<{ rows: ActivityRow[]; total: number }>("/security/activity", { rows: [], total: 0 });
+  const rows = data.rows;
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm]           = useState({ name: "", out: "", outWith: "", in: "", inWith: "" });
 
-  function handleAdd(e: React.FormEvent) {
+  async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name.trim()) return;
-    setRows((prev) => [
-      ...prev,
-      { id: String(Date.now()), ...form },
-    ]);
-    setForm({ name: "", out: "", outWith: "", in: "", inWith: "" });
-    setModalOpen(false);
+    // "8:30am" style times are applied to today's date.
+    const at = (t: string) => {
+      const m = t.trim().toLowerCase().match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/);
+      if (!m) return undefined;
+      let h = Number(m[1]);
+      if (m[3] === "pm" && h < 12) h += 12;
+      if (m[3] === "am" && h === 12) h = 0;
+      const d = new Date();
+      d.setHours(h, Number(m[2] ?? 0), 0, 0);
+      return d.toISOString();
+    };
+    const base = { name: form.name.trim(), person_type: "Resident", gate: "Main Gate", verification_type: "Manual", status: "Success" };
+    try {
+      setSaveError(null);
+      if (form.out.trim()) {
+        await securityFetch("/security/access/log", { method: "POST", body: JSON.stringify({ ...base, direction: "out", companions: form.outWith || undefined, occurred_at: at(form.out) }) });
+      }
+      if (form.in.trim()) {
+        await securityFetch("/security/access/log", { method: "POST", body: JSON.stringify({ ...base, direction: "in", companions: form.inWith || undefined, occurred_at: at(form.in) }) });
+      }
+      setForm({ name: "", out: "", outWith: "", in: "", inWith: "" });
+      setModalOpen(false);
+      await reload();
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Could not save the activity.");
+    }
   }
 
   return (
     <div className="flex flex-col gap-5">
+      <SecurityError message={error ?? saveError} />
       {/* Stat header */}
       <div className="bg-white rounded-xl border border-[--color-border] p-5 flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
@@ -56,7 +70,7 @@ export default function EstateActivityPage() {
       {/* Table */}
       <EstateActivityTable
         rows={rows}
-        total={rows.length}
+        total={data.total}
         onAddActivity={() => setModalOpen(true)}
       />
 

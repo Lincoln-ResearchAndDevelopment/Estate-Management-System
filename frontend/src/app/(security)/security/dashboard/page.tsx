@@ -7,38 +7,30 @@ import ThreatAlertBanner from "@/components/security/dashboard/ThreatAlertBanner
 import ReminderPanel from "@/components/security/dashboard/ReminderPanel";
 import EstateUpdateCard from "@/components/security/dashboard/EstateUpdateCard";
 import type { Reminder } from "@/components/security/dashboard/ReminderPanel";
+import { securityFetch } from "@/lib/security/api";
+import { SecurityError, useSecurityData } from "@/lib/security/useSecurity";
 
-// ── mock data ──────────────────────────────────────────────────────────────
-const STATS = [
-  { label: "Intelligent Reports",    value: 6,  icon: Brain         },
-  { label: "Under Threat Reports",   value: 6,  icon: AlertTriangle },
-  { label: "Estate Activities",      value: 29, icon: Activity      },
-];
-
-const REMINDERS: Reminder[] = [
-  { id: "1", text: "Review overnight patrol logs before morning briefing.", time: "7:00 AM",  priority: "high"   },
-  { id: "2", text: "Submit weekly intelligence summary to estate admin.",   time: "10:00 AM", priority: "medium" },
-  { id: "3", text: "Conduct access-card audit for Block C residents.",      time: "12:00 PM", priority: "medium" },
-  { id: "4", text: "Follow up on the two open blacklist applications.",     time: "2:00 PM",  priority: "low"    },
-  { id: "5", text: "Brief incoming shift on active under-threat cases.",    time: "4:30 PM",  priority: "high"   },
-  { id: "6", text: "Sync patrol schedule with security management HQ.",    time: "6:00 PM",  priority: "low"    },
-];
-
-const UPDATE = {
-  author:    "Estate Admin",
-  role:      "Estate Management",
-  timestamp: "Today, 8:45 AM",
-  body:      "All gate officers are reminded to enforce the new visitor pre-registration policy effective from today. Residents must pre-register guests at least 2 hours before arrival via the resident portal. Unregistered visitors will be held at Gate A pending verification.",
-  imageUrl:  "/images/patrol-car.jpg",
-};
-// ──────────────────────────────────────────────────────────────────────────
+interface DashboardData {
+  stats: { intelligence: number; threats: number; activities: number };
+  openThreats: number;
+  reminders: Reminder[];
+  update: { author: string; role: string; timestamp: string; body: string; imageUrl?: string | null } | null;
+}
 
 export default function DashboardPage() {
   const [threatVisible, setThreatVisible] = useState(true);
-  const [reminders, setReminders] = useState<Reminder[]>(REMINDERS);
+  const { data, error, reload } = useSecurityData<DashboardData>("/security/dashboard", {
+    stats: { intelligence: 0, threats: 0, activities: 0 }, openThreats: 0, reminders: [], update: null,
+  });
+  const STATS = [
+    { label: "Intelligent Reports",  value: data.stats.intelligence, icon: Brain },
+    { label: "Under Threat Reports", value: data.stats.threats,      icon: AlertTriangle },
+    { label: "Estate Activities",    value: data.stats.activities,   icon: Activity },
+  ];
 
   return (
     <div className="flex flex-col gap-5">
+      <SecurityError message={error} />
       {/* Stats row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {STATS.map((s) => (
@@ -52,9 +44,9 @@ export default function DashboardPage() {
       </div>
 
       {/* Threat banner */}
-      {threatVisible && (
+      {threatVisible && data.openThreats > 0 && (
         <ThreatAlertBanner
-          count={6}
+          count={data.openThreats}
           onDismiss={() => setThreatVisible(false)}
           onView={() => {}}
         />
@@ -64,31 +56,33 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Left – reminders */}
         <ReminderPanel
-          reminders={reminders}
-          onAdd={() => {
+          reminders={data.reminders}
+          onAdd={async () => {
             const text = window.prompt("New reminder:");
-            if (text?.trim()) {
-              setReminders((prev) => [
-                ...prev,
-                {
-                  id:       String(Date.now()),
-                  text:     text.trim(),
-                  time:     new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-                  priority: "low",
-                },
-              ]);
+            if (!text?.trim()) return;
+            try {
+              await securityFetch("/security/reminders", { method: "POST", body: JSON.stringify({ text: text.trim() }) });
+              await reload();
+            } catch (e) {
+              window.alert(e instanceof Error ? e.message : "Could not save the reminder.");
             }
           }}
         />
 
         {/* Right – estate update */}
-        <EstateUpdateCard
-          author={UPDATE.author}
-          role={UPDATE.role}
-          timestamp={UPDATE.timestamp}
-          body={UPDATE.body}
-          imageUrl={UPDATE.imageUrl}
-        />
+        {data.update ? (
+          <EstateUpdateCard
+            author={data.update.author}
+            role={data.update.role}
+            timestamp={data.update.timestamp}
+            body={data.update.body}
+            imageUrl={data.update.imageUrl ?? undefined}
+          />
+        ) : (
+          <div className="bg-white rounded-xl border border-[--color-border] p-5 text-sm text-[--color-text-muted]">
+            No estate updates have been published yet.
+          </div>
+        )}
       </div>
     </div>
   );

@@ -219,8 +219,10 @@ class SecurityController extends Controller
             'person_type' => ['nullable', Rule::in(['Resident', 'Visitor', 'Service'])],
             'house_no' => 'nullable|string|max:60',
             'vehicle_plate' => 'nullable|string|max:20',
+            'companions' => 'nullable|string|max:255',
+            'occurred_at' => 'nullable|date',
         ]);
-        $log = AccessLog::create($d + ['logged_by' => $r->user()->id, 'occurred_at' => now()]);
+        $log = AccessLog::create(array_merge($d, ['logged_by' => $r->user()->id, 'occurred_at' => $d['occurred_at'] ?? now()]));
         return response()->json(['data' => ['id' => $log->id]], 201);
     }
 
