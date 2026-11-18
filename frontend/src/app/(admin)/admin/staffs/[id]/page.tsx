@@ -1,27 +1,50 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeft, UserX } from "lucide-react";
 import { StaffMember } from "@/types/admin/staff";
-import { getStaffById, getStaffProfileDetail } from "@/lib/admin/staffData";
+import { staffApi } from "@/lib/admin/staffApi";
 import { ProfileHeader } from "@/components/admin/staff/profile/ProfileHeader";
 import { ProfileCover } from "@/components/admin/staff/profile/ProfileCover";
 import { PersonalInfoCard } from "@/components/admin/staff/profile/PersonalInfoCard";
-import { PerformanceChart } from "@/components/admin/staff/profile/PerformanceChart";
 import { EmploymentCard } from "@/components/admin/staff/profile/EmploymentCard";
-import { CurrentDutiesCard } from "@/components/admin/staff/profile/CurrentDutiesCard";
-import { VerifiedDocumentsCard } from "@/components/admin/staff/profile/VerifiedDocumentsCard";
 import { EditStaffProfileModal } from "@/components/admin/staff/EditStaffProfileModal";
 
 export default function StaffProfilePage() {
   const params = useParams<{ id: string }>();
   const staffId = Number(params?.id);
-  const initial = useMemo(() => getStaffById(staffId), [staffId]);
-
-  const [member, setMember] = useState<StaffMember | undefined>(initial);
+  const [member, setMember] = useState<StaffMember | undefined>(undefined);
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const all = await staffApi.list();
+      setMember(all.find((s) => s.id === staffId));
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load this profile.");
+    } finally {
+      setLoaded(true);
+    }
+  }, [staffId]);
+  useEffect(() => { void load(); }, [load]);
+
+  const persist = async (patch: Partial<StaffMember>) => {
+    try {
+      await staffApi.update(staffId, patch);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save changes.");
+    }
+  };
+
+  if (!loaded) {
+    return <p className="py-24 text-center text-sm text-muted">Loading profile…</p>;
+  }
 
   if (!member) {
     return (
@@ -44,27 +67,24 @@ export default function StaffProfilePage() {
     );
   }
 
-  const detail = getStaffProfileDetail(member);
+  const joined = member.created_at ? new Date(member.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—";
   const isSuspended = member.status === "suspended";
 
   return (
     <div className="space-y-6 sm:space-y-8 animate-in fade-in duration-300 pb-12 max-w-6xl">
+      {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-semibold text-red-700">{error}</div>}
       <ProfileHeader
         name={member.name}
         isSuspended={isSuspended}
         onPrint={() => window.print()}
-        onToggleSuspend={() =>
-          setMember((prev) =>
-            prev ? { ...prev, status: prev.status === "active" ? "suspended" : "active" } : prev
-          )
-        }
+        onToggleSuspend={() => void persist({ status: member.status === "active" ? "suspended" : "active" })}
         onEdit={() => setIsEditOpen(true)}
       />
 
       <ProfileCover
         name={member.name}
         jobTitle={member.job_title}
-        department={member.department || "Operations"}
+        department={member.department || "—"}
         avatarUrl={
           member.avatar_url ||
           `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&background=B22222&color=fff&bold=true`
@@ -78,35 +98,25 @@ export default function StaffProfilePage() {
           <PersonalInfoCard
             email={member.email}
             phone={member.phone || "—"}
-            address={detail.home_address}
+            address="—"
           />
-        </div>
-        <div className="lg:col-span-7 xl:col-span-8">
-          <PerformanceChart data={detail.performance} year={detail.performance_year} />
         </div>
       </div>
 
       {/* Row 2: Employment + Duties */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
         <EmploymentCard
-          employeeId={detail.employee_id}
-          joinDate={detail.join_date}
-          department={member.department || "Operations"}
-          reportsTo={detail.reports_to}
-          leaveUsed={detail.leave_used}
-          leaveTotal={detail.leave_total}
+          employeeId={member.staff_id || `#${member.id}`}
+          joinDate={joined}
+          department={member.department || "—"}
         />
-        <CurrentDutiesCard duties={detail.duties} />
       </div>
-
-      {/* Row 3: Documents */}
-      <VerifiedDocumentsCard documents={detail.documents} />
 
       <EditStaffProfileModal
         member={member}
         isOpen={isEditOpen}
         onClose={() => setIsEditOpen(false)}
-        onSave={(data) => setMember((prev) => (prev ? { ...prev, ...data } : prev))}
+        onSave={(data) => void persist(data)}
       />
     </div>
   );

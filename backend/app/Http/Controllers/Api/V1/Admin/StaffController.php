@@ -96,78 +96,13 @@ class StaffController extends Controller
      */
     public function show(int $id): JsonResponse
     {
-        $user = User::find($id);
+        $user = User::findOrFail($id);
 
         return response()->json([
             'status' => 'success',
             'data' => [
                 'staff' => $user,
-                'home_address' => '422 Oakwood Dr, Maplewood, NJ 07040',
-                'join_date' => 'Oct 12, 2021',
-                'reports_to' => [
-                    'name' => 'Sarah Jenkins',
-                    'avatar_url' => 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=200&q=80',
-                ],
-                'annual_leave_used' => 14,
-                'annual_leave_total' => 20,
-                'performance_year' => 2024,
-                'performance' => [
-                    ['month' => 'JAN', 'value' => 86],
-                    ['month' => 'FEB', 'value' => 92],
-                    ['month' => 'MAR', 'value' => 78],
-                    ['month' => 'APR', 'value' => 95, 'is_highlighted' => true],
-                    ['month' => 'MAY', 'value' => 88],
-                    ['month' => 'JUN', 'value' => 90],
-                ],
-                'duties' => [
-                    [
-                        'id' => 'duty-1',
-                        'title' => 'The Grandview Residences',
-                        'subtitle' => 'Primary Site Management & Inspection',
-                        'frequency' => 'DAILY',
-                        'icon' => 'building',
-                    ],
-                    [
-                        'id' => 'duty-2',
-                        'title' => 'Q2 Quarterly Audit',
-                        'subtitle' => 'Financial Compliance Verification',
-                        'frequency' => 'URGENT',
-                        'icon' => 'file',
-                    ],
-                    [
-                        'id' => 'duty-3',
-                        'title' => 'Tenant Liaison',
-                        'subtitle' => 'Dispute resolution & lease renewals',
-                        'frequency' => 'WEEKLY',
-                        'icon' => 'handshake',
-                    ],
-                ],
-                'documents' => [
-                    [
-                        'id' => 'doc-1',
-                        'filename' => 'Employment_Contract.pdf',
-                        'meta_text' => 'Signed: Oct 11, 2021',
-                        'kind' => 'pdf',
-                    ],
-                    [
-                        'id' => 'doc-2',
-                        'filename' => 'Identity_Verification.png',
-                        'meta_text' => 'Expires: Dec 2026',
-                        'kind' => 'id',
-                    ],
-                    [
-                        'id' => 'doc-3',
-                        'filename' => 'Tax_Compliance_2023.pdf',
-                        'meta_text' => 'Status: Verified',
-                        'kind' => 'verified',
-                    ],
-                    [
-                        'id' => 'doc-4',
-                        'filename' => 'Performance_Review_Q1.pdf',
-                        'meta_text' => 'Last updated 2w ago',
-                        'kind' => 'doc',
-                    ],
-                ],
+                'join_date' => $user->created_at?->format('M d, Y'),
             ],
         ]);
     }
