@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/admin/utils";
 import { clearSession } from "@/components/auth/session";
+import { useChatSummary } from "@/lib/chat/useChatSummary";
 
 interface SidebarProps {
   isOpen?: boolean;
@@ -27,7 +28,7 @@ const navItems = [
   { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
   { name: "Finance", href: "/admin/finance", icon: CreditCard },
   { name: "Store", href: "/admin/store", icon: Store },
-  { name: "Messages", href: "/admin/messages", icon: MessageSquare, badge: 6 },
+  { name: "Messages", href: "/admin/messages", icon: MessageSquare },
   { name: "Reports", href: "/admin/reports", icon: BarChart3 },
   { name: "Staffs", href: "/admin/staffs", icon: Users },
   { name: "Listings", href: "/admin/listings", icon: ClipboardCheck }, // agent listing approval (KAN-66)
@@ -35,6 +36,7 @@ const navItems = [
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
+  const { summary } = useChatSummary();
 
   return (
     <>
@@ -116,7 +118,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   <span>{item.name}</span>
                 </div>
 
-                {item.badge && (
+                {item.href === "/admin/messages" && summary.unread_total > 0 && (
                   <span
                     className={cn(
                       "px-2 py-0.5 text-xs font-bold rounded-full",
@@ -125,7 +127,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                         : "bg-accent text-dark"
                     )}
                   >
-                    {item.badge}
+                    {summary.unread_total}
                   </span>
                 )}
               </Link>
