@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from "react";
 import { Phone, CalendarDays, Sparkles, Check } from "lucide-react";
 import { ClientRequest, Listing, RequestStatus } from "@/types/agentPortal";
-import { initialsFor } from "@/data/mockAgentData";
+import { initialsFor } from "@/components/agents/initials";
 import { dayLabel, formatDate, matchListings, requestSummary } from "./portalUtils";
 
 interface ClientRequestsSectionProps {
@@ -17,6 +17,7 @@ const statusStyle: Record<RequestStatus, string> = {
   New: "bg-primary-light text-primary",
   Contacted: "bg-blue-50 text-blue-700",
   "Viewing Booked": "bg-amber-50 text-amber-700",
+  Negotiation: "bg-purple-50 text-purple-700",
   Closed: "bg-slate-100 text-slate-500",
 };
 

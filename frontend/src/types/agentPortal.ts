@@ -33,7 +33,7 @@ export interface Listing {
 export type ApprovalStatus = "pending" | "approved" | "rejected";
 export type ListingKind = "rent" | "sale" | "other";
 
-export type RequestStatus = "New" | "Contacted" | "Viewing Booked" | "Closed";
+export type RequestStatus = "New" | "Contacted" | "Viewing Booked" | "Negotiation" | "Closed";
 
 export interface ClientRequest {
   id: string;

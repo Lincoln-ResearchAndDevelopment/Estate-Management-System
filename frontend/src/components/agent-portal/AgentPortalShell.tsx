@@ -12,7 +12,7 @@ import {
   Bell,
 } from "lucide-react";
 import { clearSession, readSession } from "@/components/auth/session";
-import { initialsFor, mockAgents } from "@/data/mockAgentData";
+import { initialsFor } from "@/components/agents/initials";
 
 export interface PortalAgent {
   id: string;
@@ -40,19 +40,8 @@ const NAV = [
   { label: "Earnings", href: "#earnings", icon: Wallet },
 ];
 
-/** Resolve the signed-in email to an agent profile (falls back to a profile built from the email). */
+/** Build the signed-in agent's display profile from their email (the portal page shows the real name from the API). */
 function resolveAgent(email: string): PortalAgent {
-  const match = mockAgents.find((a) => a.email.toLowerCase() === email.toLowerCase());
-  if (match) {
-    return {
-      id: match.id,
-      name: match.name,
-      firstName: match.name.split(" ")[0],
-      initials: match.initials,
-      email: match.email,
-      zone: match.zone,
-    };
-  }
   const local = email.split("@")[0] ?? "agent";
   const name =
     local
@@ -61,12 +50,12 @@ function resolveAgent(email: string): PortalAgent {
       .map((p) => p[0].toUpperCase() + p.slice(1))
       .join(" ") || "Agent";
   return {
-    id: "AGT-NEW",
+    id: "",
     name,
     firstName: name.split(" ")[0],
     initials: initialsFor(name) || "AG",
     email,
-    zone: "Phase 1 – Lekki",
+    zone: "",
   };
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Download, UserPlus, CalendarDays, RotateCcw } from "lucide-react";
+import { Download, UserPlus, CalendarDays } from "lucide-react";
 import { AgentKpiCards } from "@/components/agents/AgentKpiCards";
 import { AgentPerformanceChart } from "@/components/agents/AgentPerformanceChart";
 import { LeadPipelineCard } from "@/components/agents/LeadPipelineCard";
@@ -11,25 +11,33 @@ import { AgentsTable } from "@/components/agents/AgentsTable";
 import { AddAgentModal } from "@/components/agents/AddAgentModal";
 import { AgentDetailDrawer } from "@/components/agents/AgentDetailDrawer";
 import { AgentToast } from "@/components/agents/AgentToast";
-import { usePersistentState } from "@/components/agents/usePersistentState";
+import { agentsFetch } from "@/lib/agents/api";
 import {
   agentsToCsv,
   buildAgentKpis,
   downloadTextFile,
 } from "@/components/agents/agentUtils";
-import {
-  avatarColorFor,
-  initialsFor,
-  mockAgentDashboard,
-} from "@/data/mockAgentData";
-import { Agent, AgentStatus, NewAgentInput } from "@/types/agent";
+import { Agent, AgentDashboardData, AgentStatus, NewAgentInput } from "@/types/agent";
+
+const EMPTY: AgentDashboardData = { performance: [], pipeline: [], agents: [], viewings: [] };
 
 export default function AgentDashboardPage() {
-  const [agents, setAgents, resetAgents] = usePersistentState<Agent[]>(
-    "lincoln.admin.agents",
-    mockAgentDashboard.agents
-  );
-  const [visibleAgents, setVisibleAgents] = useState<Agent[]>(mockAgentDashboard.agents);
+  const [dash, setDash] = useState<AgentDashboardData>(EMPTY);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const agents = dash.agents;
+  const [visibleAgents, setVisibleAgents] = useState<Agent[]>([]);
+  useEffect(() => setVisibleAgents(dash.agents), [dash.agents]);
+
+  const load = useCallback(async () => {
+    try {
+      setDash((await agentsFetch<{ data: AgentDashboardData }>("/admin/agents")).data);
+      setLoadError(null);
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "Could not load agents.");
+    }
+  }, []);
+  useEffect(() => { void load(); }, [load]);
+
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -55,32 +63,29 @@ export default function AgentDashboardPage() {
   const closeAdd = useCallback(() => setIsAddOpen(false), []);
   const dismissToast = useCallback(() => setToast(null), []);
 
-  const handleCreate = (input: NewAgentInput) => {
-    const nextNum =
-      agents.reduce((max, a) => Math.max(max, parseInt(a.id.replace(/\D/g, ""), 10) || 0), 0) + 1;
-    const agent: Agent = {
-      ...input,
-      id: `AGT-${String(nextNum).padStart(3, "0")}`,
-      initials: initialsFor(input.name),
-      avatarBg: avatarColorFor(nextNum - 1),
-      joinedOn: new Date().toISOString().slice(0, 10),
-      activeListings: 0,
-      openLeads: 0,
-      dealsClosed: 0,
-      commission: 0,
-      targetProgress: 0,
-      rating: 0,
-      reviews: 0,
-    };
-    setAgents((prev) => [agent, ...prev]);
-    setIsAddOpen(false);
-    setToast(`${agent.name} was added as ${agent.id}.`);
+  const handleCreate = async (input: NewAgentInput) => {
+    try {
+      const res = await agentsFetch<{ data: { id: string }; temporary_password: string }>("/admin/agents", {
+        method: "POST",
+        body: JSON.stringify(input),
+      });
+      setIsAddOpen(false);
+      setToast(`${input.name} was added as ${res.data.id}. Temporary password: ${res.temporary_password} (shown once).`);
+      await load();
+    } catch (e) {
+      setToast(e instanceof Error ? e.message : "Could not add the agent.");
+    }
   };
 
-  const handleStatusChange = (agentId: string, status: AgentStatus) => {
+  const handleStatusChange = async (agentId: string, status: AgentStatus) => {
     const agent = agents.find((a) => a.id === agentId);
-    setAgents((prev) => prev.map((a) => (a.id === agentId ? { ...a, status } : a)));
-    if (agent) setToast(`${agent.name} is now ${status}.`);
+    try {
+      await agentsFetch(`/admin/agents/${agentId}`, { method: "PATCH", body: JSON.stringify({ status }) });
+      if (agent) setToast(`${agent.name} is now ${status}.`);
+      await load();
+    } catch (e) {
+      setToast(e instanceof Error ? e.message : "Could not change the status.");
+    }
   };
 
   const handleExport = () => {
@@ -94,6 +99,7 @@ export default function AgentDashboardPage() {
   return (
     <>
     <div className="space-y-6">
+      {loadError && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-semibold text-red-700">{loadError}</div>}
       {/* Page Title & Quick Actions */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
@@ -136,10 +142,10 @@ export default function AgentDashboardPage() {
       {/* Performance chart + Lead pipeline */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         <div className="lg:col-span-8">
-          <AgentPerformanceChart data={mockAgentDashboard.performance} />
+          <AgentPerformanceChart data={dash.performance} />
         </div>
         <div className="lg:col-span-4">
-          <LeadPipelineCard pipeline={mockAgentDashboard.pipeline} />
+          <LeadPipelineCard pipeline={dash.pipeline} />
         </div>
       </div>
 
@@ -147,7 +153,7 @@ export default function AgentDashboardPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <TopAgentsCard agents={agents} onView={openAgent} />
         <UpcomingViewingsCard
-          viewings={mockAgentDashboard.viewings}
+          viewings={dash.viewings}
           agents={agents}
           onViewAgent={openAgent}
         />
@@ -156,22 +162,6 @@ export default function AgentDashboardPage() {
       {/* Agent directory */}
       <AgentsTable agents={agents} onView={openAgent} onFilteredChange={setVisibleAgents} />
 
-      <div className="flex justify-center pb-2">
-        <button
-          type="button"
-          onClick={() => {
-            if (window.confirm("Reset the agent list back to the sample data? Your changes will be lost.")) {
-              resetAgents();
-              setSelectedId(null);
-              setToast("Sample data restored.");
-            }
-          }}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-400 transition-colors hover:text-primary"
-        >
-          <RotateCcw className="h-3.5 w-3.5" />
-          Reset sample data
-        </button>
-      </div>
     </div>
 
       {/* Overlays (outside the space-y container so they get no stray top margin) */}
@@ -183,7 +173,7 @@ export default function AgentDashboardPage() {
       />
       <AgentDetailDrawer
         agent={selectedAgent}
-        viewings={mockAgentDashboard.viewings}
+        viewings={dash.viewings}
         onClose={closeDrawer}
         onStatusChange={handleStatusChange}
       />

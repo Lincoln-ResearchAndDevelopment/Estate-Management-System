@@ -50,7 +50,15 @@ class ListingController extends Controller
     public function inquire(Request $request, int $id): JsonResponse
     {
         $request->validate(['name' => 'required|string|max:100', 'phone' => 'required|string|max:30', 'message' => 'nullable|string|max:1000']);
-        Listing::public()->findOrFail($id)->increment('inquiries');
+        $listing = Listing::public()->findOrFail($id);
+        $listing->increment('inquiries');
+        $req = \App\Models\ClientRequest::create([
+            'agent_id' => $listing->agent_id, 'listing_id' => $listing->id, 'client_name' => $request->input('name'),
+            'phone' => $request->input('phone'), 'note' => $request->input('message'), 'property_type' => $listing->property_type,
+            'min_beds' => (int) $listing->beds, 'zone' => $listing->zone, 'max_budget_kobo' => $listing->price_kobo,
+        ]);
+        \App\Models\AppNotification::create(['user_id' => $listing->agent_id, 'type' => 'inquiry', 'title' => 'New inquiry: '.$listing->title,
+            'body' => $req->client_name.' ('.$req->phone.')', 'data' => ['client_request_id' => $req->id]]);
 
         return response()->json(['status' => 'success', 'message' => 'The agent has been notified.']);
     }

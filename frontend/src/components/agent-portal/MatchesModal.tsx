@@ -10,7 +10,7 @@ interface MatchesModalProps {
   request: ClientRequest | null;
   listings: Listing[];
   onClose: () => void;
-  onBook: (input: { request: ClientRequest; listing: Listing; date: string; time: string }) => string | null;
+  onBook: (input: { request: ClientRequest; listing: Listing; date: string; time: string }) => Promise<string | null> | string | null;
 }
 
 const TIMES = ["09:00", "10:30", "12:00", "13:30", "15:00", "16:30"];
@@ -44,8 +44,9 @@ export function MatchesModal({ request, listings, onClose, onBook }: MatchesModa
       setError("Pick today or a future date.");
       return;
     }
-    const problem = onBook({ request, listing: picked, date, time });
-    if (problem) setError(problem);
+    void Promise.resolve(onBook({ request, listing: picked, date, time })).then((problem) => {
+      if (problem) setError(problem);
+    });
   };
 
   return (
