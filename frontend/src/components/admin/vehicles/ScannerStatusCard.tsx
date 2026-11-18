@@ -6,46 +6,28 @@ import { ScannerFeed } from "@/types/admin/vehicle";
 import { cn } from "@/lib/admin/utils";
 
 interface ScannerStatusCardProps {
-  initialFeeds: ScannerFeed[];
+  feeds: ScannerFeed[];
+  onRefresh: () => Promise<void>;
+  onToggle: (id: string, enabled: boolean) => Promise<void>;
 }
 
-export function ScannerStatusCard({ initialFeeds }: ScannerStatusCardProps) {
-  const [feeds, setFeeds] = useState<ScannerFeed[]>(initialFeeds);
+export function ScannerStatusCard({ feeds, onRefresh, onToggle }: ScannerStatusCardProps) {
   const [isRunningDiag, setIsRunningDiag] = useState(false);
   const [diagMessage, setDiagMessage] = useState<string | null>(null);
 
-  const handleRunDiagnostics = () => {
+  // Re-checks every scanner's last report. A scanner is online only if it pinged in the last 5 minutes.
+  const handleRunDiagnostics = async () => {
     setIsRunningDiag(true);
     setDiagMessage(null);
-
-    setTimeout(() => {
-      setIsRunningDiag(false);
-      const hadOffline = feeds.some((f) => f.status === "offline");
-      if (hadOffline) {
-        setFeeds((prev) =>
-          prev.map((f) =>
-            f.status === "offline" ? { ...f, status: "online" } : f
-          )
-        );
-        setDiagMessage("ANPR Service Gate reconnected (3/3 online).");
-      } else {
-        setDiagMessage("All 3 ANPR feeds verified healthy (12ms latency).");
-      }
-    }, 800);
+    await onRefresh();
+    setIsRunningDiag(false);
+    const online = feeds.filter((f) => f.status === "online").length;
+    setDiagMessage(feeds.length === 0 ? "No scanners registered yet." : `${online} of ${feeds.length} scanners reporting.`);
   };
 
   const handleToggleFeedStatus = (id: string) => {
-    setFeeds((prev) =>
-      prev.map((f) =>
-        f.id === id
-          ? {
-              ...f,
-              status: f.status === "online" ? "offline" : "online",
-              offline_label: "OFFLINE - Check Conn.",
-            }
-          : f
-      )
-    );
+    const feed = feeds.find((f) => f.id === id);
+    if (feed) void onToggle(id, feed.offline_label === "DISABLED");
   };
 
   return (

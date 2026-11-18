@@ -13,11 +13,7 @@ import {
   Trash2,
   ShieldCheck,
 } from "lucide-react";
-import {
-  mobileVehicleMetrics,
-  mobileScannerItems,
-  initialMobileVehicleDirectory,
-} from "@/lib/admin/vehicleData";
+import { useVehicles } from "@/lib/admin/vehicleApi";
 import {
   MobileScannerItem,
   MobileVehicleDirectoryItem,
@@ -60,11 +56,9 @@ function MobileKpiRightIcon({
 export function VehicleManagementMobileView({
   isStandalonePreview = false,
 }: VehicleManagementMobileViewProps) {
-  const [scanners, setScanners] =
-    useState<MobileScannerItem[]>(mobileScannerItems);
-  const [vehicles, setVehicles] = useState<MobileVehicleDirectoryItem[]>(
-    initialMobileVehicleDirectory
-  );
+  const api = useVehicles();
+  const scanners: MobileScannerItem[] = api.data.scanners;
+  const vehicles = api.data.mobileDirectory;
   const [searchPlates, setSearchPlates] = useState("");
   const [showAllVehicles, setShowAllVehicles] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
@@ -86,27 +80,18 @@ export function VehicleManagementMobileView({
     : filteredVehicles.slice(0, 3);
 
   const handleToggleScanner = (id: string) => {
-    setScanners((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, online: !s.online } : s))
-    );
+    const sc = api.data.scanners.find((x) => x.id === id);
+    if (sc) void api.setScannerEnabled(id, sc.offline_label === "DISABLED");
   };
 
   const handleToggleBadge = (id: number) => {
-    setVehicles((prev) =>
-      prev.map((v) =>
-        v.id === id
-          ? {
-              ...v,
-              badge: v.badge === "RESIDENT" ? "VISITOR" : "RESIDENT",
-            }
-          : v
-      )
-    );
+    const v = vehicles.find((x) => x.id === id);
+    if (v) void api.patch(id, { owner_role: v.badge === "RESIDENT" ? "Visitor" : "Resident" });
     setOpenMenuId(null);
   };
 
   const handleRemoveVehicle = (id: number) => {
-    setVehicles((prev) => prev.filter((v) => v.id !== id));
+    void api.remove(id);
     setOpenMenuId(null);
   };
 
@@ -117,6 +102,9 @@ export function VehicleManagementMobileView({
         isStandalonePreview && "max-w-[430px] mx-auto"
       )}
     >
+      {api.error && (
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-semibold text-red-700">{api.error}</div>
+      )}
       {/* ================= HEADER ================= */}
       <div>
         <h1 className="text-xl sm:text-2xl font-extrabold text-dark tracking-tight">
@@ -129,7 +117,7 @@ export function VehicleManagementMobileView({
 
       {/* ================= 3 STACKED HORIZONTAL KPI CARDS ================= */}
       <div className="space-y-3">
-        {mobileVehicleMetrics.map((metric) => (
+        {api.data.mobileMetrics.map((metric) => (
           <div
             key={metric.id}
             className="bg-surface-card rounded-2xl border border-border/80 px-5 py-4 shadow-2xs flex items-center justify-between gap-4"

@@ -10,11 +10,7 @@ import {
   ClipboardCheck,
   Ban,
 } from "lucide-react";
-import {
-  initialVehicleMetrics,
-  initialVehicleRecords,
-  initialScannerFeeds,
-} from "@/lib/admin/vehicleData";
+import { useVehicles } from "@/lib/admin/vehicleApi";
 import {
   VehicleMetricItem,
   VehicleOwnerRole,
@@ -60,12 +56,9 @@ function VehicleKpiIcon({
 }
 
 export function VehicleManagementView() {
-  const [vehicles, setVehicles] = useState<VehicleRecord[]>(
-    initialVehicleRecords
-  );
-  const [metrics, setMetrics] = useState<VehicleMetricItem[]>(
-    initialVehicleMetrics
-  );
+  const api = useVehicles();
+  const vehicles = api.data.vehicles;
+  const metrics = api.data.metrics;
   const [selectedStatus, setSelectedStatus] = useState<VehicleStatus | "all">(
     "all"
   );
@@ -85,44 +78,26 @@ export function VehicleManagementView() {
     });
   }, [vehicles, selectedStatus, selectedRole]);
 
-  const handleAddVehicle = (newVehicle: Omit<VehicleRecord, "id">) => {
-    const created: VehicleRecord = {
-      ...newVehicle,
-      id: Date.now(),
-    };
-    setVehicles((prev) => [created, ...prev]);
-
-    setMetrics((prev) =>
-      prev.map((m) => {
-        if (m.id === "registered") return { ...m, value: m.value + 1 };
-        if (m.id === "visitor" && created.owner_role === "Visitor")
-          return { ...m, value: m.value + 1 };
-        if (m.id === "pending" && created.status === "pending")
-          return { ...m, value: m.value + 1 };
-        if (m.id === "disabled" && created.status === "disabled")
-          return { ...m, value: m.value + 1 };
-        return m;
-      })
-    );
+  const handleAddVehicle = (v: Omit<VehicleRecord, "id">) => {
+    void api.add({
+      owner_name: v.owner_name,
+      owner_role: v.owner_role,
+      house_unit: v.house_unit || undefined,
+      vehicle_type: v.vehicle_type,
+      plate_number: v.plate_number,
+      status: v.status,
+    });
   };
 
   const handleCycleVehicleStatus = (id: number) => {
-    setVehicles((prev) =>
-      prev.map((v) => {
-        if (v.id !== id) return v;
-        const nextStatus: VehicleStatus =
-          v.status === "active"
-            ? "pending"
-            : v.status === "pending"
-              ? "disabled"
-              : "active";
-        return { ...v, status: nextStatus };
-      })
-    );
+    const cur = vehicles.find((v) => v.id === id);
+    if (!cur) return;
+    const next: VehicleStatus = cur.status === "active" ? "pending" : cur.status === "pending" ? "disabled" : "active";
+    void api.patch(id, { status: next });
   };
 
   const totalRegisteredCount =
-    metrics.find((m) => m.id === "registered")?.value ?? 850;
+    metrics.find((m) => m.id === "registered")?.value ?? 0;
 
   return (
     <>
@@ -133,6 +108,9 @@ export function VehicleManagementView() {
 
       {/* ================= DESKTOP & TABLET LAYOUT (md+) — TASK 13 ================= */}
       <div className="hidden md:block space-y-6 animate-in fade-in duration-300 pb-6">
+        {api.error && (
+          <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{api.error}</div>
+        )}
         {/* ================= BREADCRUMB & HEADER ROW ================= */}
       <div className="space-y-1.5">
         <nav
@@ -283,7 +261,7 @@ export function VehicleManagementView() {
 
         {/* Right 4 Columns: Scanner Status & Automated Access */}
         <div className="lg:col-span-4">
-          <ScannerStatusCard initialFeeds={initialScannerFeeds} />
+          <ScannerStatusCard feeds={api.data.scanners} onRefresh={api.reload} onToggle={(id, enabled) => api.setScannerEnabled(id, enabled)} />
         </div>
       </div>
 
