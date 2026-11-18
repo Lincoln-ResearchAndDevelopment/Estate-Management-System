@@ -35,9 +35,9 @@ export interface SecurityIncident {
 
 export interface SecuritySummaryData {
   vehicles_entered: number;
-  vehicles_trend: string; // '↑ 12%'
+  vehicles_trend?: string;
   pedestrians: number;
-  pedestrians_trend: string; // '↓ 3%'
+  pedestrians_trend?: string;
   alert_title: string;
   alert_description: string;
   incidents: SecurityIncident[];

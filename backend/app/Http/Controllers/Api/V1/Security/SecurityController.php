@@ -215,6 +215,10 @@ class SecurityController extends Controller
             'status' => ['required', Rule::in(['Authorised', 'Success', 'Denied', 'Flagged'])],
             'failure_reason' => 'nullable|string|max:255',
             'user_id' => 'nullable|integer|exists:users,id',
+            'direction' => ['nullable', Rule::in(['in', 'out'])],
+            'person_type' => ['nullable', Rule::in(['Resident', 'Visitor', 'Service'])],
+            'house_no' => 'nullable|string|max:60',
+            'vehicle_plate' => 'nullable|string|max:20',
         ]);
         $log = AccessLog::create($d + ['logged_by' => $r->user()->id, 'occurred_at' => now()]);
         return response()->json(['data' => ['id' => $log->id]], 201);

@@ -12,11 +12,7 @@ import {
   IdCard,
   ChevronRight,
 } from "lucide-react";
-import {
-  initialAccessMetrics,
-  initialAccessLogs,
-  initialSecuritySummary,
-} from "@/lib/admin/accessData";
+import { useAccessOverview } from "@/lib/admin/accessApi";
 import { AccessGate, AccessMetricIconType, AccessStatus } from "@/types/admin/access";
 import { AccessLogCard } from "./AccessLogCard";
 import { SecuritySummaryCard } from "./SecuritySummaryCard";
@@ -46,6 +42,8 @@ export function CheckInOutDashboardView() {
   const [dateRange, setDateRange] = useState<"Today" | "Yesterday" | "This Week">(
     "Today"
   );
+  const rangeKey = dateRange === "Today" ? "today" : dateRange === "Yesterday" ? "yesterday" : "week";
+  const { data: access, error: loadError } = useAccessOverview(rangeKey);
   const [selectedGate, setSelectedGate] = useState<AccessGate | "All">("All");
   const [selectedStatus, setSelectedStatus] = useState<AccessStatus | "All">(
     "All"
@@ -55,7 +53,7 @@ export function CheckInOutDashboardView() {
 
   const filteredLogs = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    return initialAccessLogs.filter((log) => {
+    return access.logs.filter((log) => {
       const matchesGate = selectedGate === "All" || log.gate === selectedGate;
       const matchesStatus =
         selectedStatus === "All" || log.status === selectedStatus;
@@ -67,7 +65,7 @@ export function CheckInOutDashboardView() {
         log.gate.toLowerCase().includes(q);
       return matchesGate && matchesStatus && matchesQuery;
     });
-  }, [selectedGate, selectedStatus, searchQuery]);
+  }, [access.logs, selectedGate, selectedStatus, searchQuery]);
 
   const handleCycleDate = () => {
     setDateRange((prev) =>
@@ -245,9 +243,13 @@ export function CheckInOutDashboardView() {
         </div>
       </div>
 
+      {loadError && (
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{loadError}</div>
+      )}
+
       {/* ================= 4 WATERMARK KPI METRIC CARDS ================= */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5">
-        {initialAccessMetrics.map((metric) => {
+        {access.metrics.map((metric) => {
           const badgeStyle =
             metric.iconType === "residents"
               ? "bg-primary-light text-primary"
@@ -299,7 +301,7 @@ export function CheckInOutDashboardView() {
 
         {/* Right 4 Columns: Today's Security Summary */}
         <div className="lg:col-span-4">
-          <SecuritySummaryCard summary={initialSecuritySummary} />
+          <SecuritySummaryCard summary={access.summary} />
         </div>
       </div>
       </div>

@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\Admin\ReminderController;
 use App\Http\Controllers\Api\V1\Admin\EstateUpdateController;
 use App\Http\Controllers\Api\V1\Admin\UserController;
 use App\Http\Controllers\Api\V1\Admin\StaffController;
+use App\Http\Controllers\Api\V1\Admin\AccessController;
 
 /*
 |--------------------------------------------------------------------------
@@ -37,6 +38,9 @@ Route::prefix('v1')->group(function () {
         Route::patch('users/{id}/toggle-status', [UserController::class, 'toggleStatus']);
         Route::post('users/{id}/reset-password', [UserController::class, 'resetPassword']);
         Route::apiResource('users', UserController::class);
+
+        // Check-in / check-out monitoring
+        Route::get('access', [AccessController::class, 'index']);
 
         // Staff Management (Task 4 & 5)
         Route::get('staff/metrics', [StaffController::class, 'metrics']);
