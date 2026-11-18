@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\Admin\EstateUpdateController;
 use App\Http\Controllers\Api\V1\Admin\UserController;
 use App\Http\Controllers\Api\V1\Admin\StaffController;
 use App\Http\Controllers\Api\V1\Admin\AccessController;
+use App\Http\Controllers\Api\V1\Admin\AwayController;
 
 /*
 |--------------------------------------------------------------------------
@@ -41,6 +42,12 @@ Route::prefix('v1')->group(function () {
 
         // Check-in / check-out monitoring
         Route::get('access', [AccessController::class, 'index']);
+
+        // Away notifications
+        Route::get('away', [AwayController::class, 'index']);
+        Route::post('away', [AwayController::class, 'store']);
+        Route::put('away/{id}', [AwayController::class, 'update']);
+        Route::post('away/{id}/returned', [AwayController::class, 'markReturned']);
 
         // Staff Management (Task 4 & 5)
         Route::get('staff/metrics', [StaffController::class, 'metrics']);

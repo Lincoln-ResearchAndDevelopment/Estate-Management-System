@@ -20,6 +20,9 @@ export interface AwayResidentRecord {
   emergency_contact_phone?: string;
   notify_security: boolean;
   suspend_packages: boolean;
+  user_id?: number | null;
+  departure_iso?: string;
+  expected_return_iso?: string;
 }
 
 export interface UpcomingReturnItem {
@@ -37,6 +40,20 @@ export interface ResidentSelectOption {
   resident_name: string;
   unit: string;
   initials: string;
+  user_id?: number;
+}
+
+export interface AwaySavePayload {
+  user_id?: number | null;
+  resident_name: string;
+  unit: string;
+  departure_date: string;       // yyyy-mm-dd
+  expected_return_date: string; // yyyy-mm-dd
+  emergency_contact_name?: string;
+  emergency_contact_phone?: string;
+  notes?: string;
+  notify_security?: boolean;
+  suspend_packages?: boolean;
 }
 
 export type MobileAwayLogStatus = "AWAY" | "RETURNING SOON";
