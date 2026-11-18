@@ -5,10 +5,12 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import React, { useState } from "react";
-import { Bell, Compass, LayoutDashboard, LogOut, Mail, Menu, Search, Store, Wallet, X } from "lucide-react";
+import { Compass, LayoutDashboard, LogOut, Mail, Menu, Search, Store, Wallet, X } from "lucide-react";
 import { clearSession, readSession } from "@/components/auth/session";
 import { useRequireRole } from "@/components/auth/useRequireRole";
 import { send } from "@/lib/resident/api";
+import { useChatSummary } from "@/lib/chat/useChatSummary";
+import { NotificationPopover } from "@/components/chat/NotificationPopover";
 
 const NAV = [
   { href: "/resident", label: "Dashboard", icon: LayoutDashboard, exact: true },
@@ -18,8 +20,10 @@ const NAV = [
   { href: "/resident/direction", label: "Direction", icon: Compass },
 ];
 
-export function ResidentShell({ children, unreadMessages = 0, unreadAlerts = 0 }: { children: React.ReactNode; unreadMessages?: number; unreadAlerts?: number }) {
+export function ResidentShell({ children }: { children: React.ReactNode }) {
   const allowed = useRequireRole(["User"]);
+  const { summary, refresh } = useChatSummary();
+  const unreadMessages = summary.unread_messages;
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -50,10 +54,7 @@ export function ResidentShell({ children, unreadMessages = 0, unreadAlerts = 0 }
           <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand" />
         </label>
         <div className="ml-auto flex items-center gap-4">
-          <button aria-label="Notifications" className="relative text-brand">
-            <Bell className="h-6 w-6" />
-            {unreadAlerts > 0 && <span className="absolute -right-2 -top-2 rounded bg-alert px-1 text-[10px] font-semibold text-white">{unreadAlerts}</span>}
-          </button>
+          <NotificationPopover unread={summary.unread_total} onChanged={refresh} onSeeAll={() => router.push("/resident/messages")} />
           <Link href="/resident/profile" aria-label="My profile" title={email} className="flex h-11 w-11 items-center justify-center rounded-xl bg-mint text-sm font-bold text-brand">
             {email.slice(0, 2).toUpperCase() || "ME"}
           </Link>

@@ -39,3 +39,4 @@ Route::middleware($enforce ? ['auth:sanctum', 'role:store_owner|admin|super_admi
 
 require __DIR__.'/api/agents.php';   // carries its own auth + role middleware
 require __DIR__.'/api/resident.php'; // carries its own auth + role middleware
+require __DIR__.'/api/chat.php';     // shared chat, notifications, alerts, meetings (auth:sanctum)

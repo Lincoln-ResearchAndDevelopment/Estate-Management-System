@@ -215,6 +215,22 @@ class ResidentController extends Controller
             'note' => $d['note'] ?? null,
         ]);
 
+        // Surface it in the shared alert list and notify security/admin staff.
+        $shared = \App\Models\EstateAlert::create([
+            'sender_id' => $u->id,
+            'category' => 'life_threat',
+            'message' => 'Life under threat'.($d['note'] ?? false ? ': '.$d['note'] : ''),
+            'location' => $alert->location,
+        ]);
+        foreach (\App\Models\User::whereIn('role', ['super_admin', 'admin', 'manager', 'security'])->pluck('id') as $uid) {
+            \App\Models\AppNotification::create([
+                'user_id' => $uid, 'type' => 'alert',
+                'title' => $u->name.' sent you an alert',
+                'body' => 'Life under threat'.($alert->location ? ' at '.$alert->location : ''),
+                'data' => ['alert_id' => $shared->id, 'category' => 'life_threat'],
+            ]);
+        }
+
         return $this->ok(['id' => $alert->id, 'message' => 'Security has been alerted.'], 201);
     }
 }
