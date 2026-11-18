@@ -20,6 +20,8 @@ import {
   useSiteSettings,
 } from "./site-settings";
 import { checkoutCustomerStorageKey } from "../lib/checkout";
+import { storeFetch } from "../lib/api";
+import { ChatCenter } from "@/components/chat/ChatCenter";
 
 type StoreProduct = {
   id: string;
@@ -33,91 +35,14 @@ type StoreProduct = {
   featured: boolean;
 };
 
-const productStorageKey = "lincoln-estate-products";
-const planStorageKey = "lincoln-estate-plan";
-const registrationStorageKey = "lincoln-estate-registration";
+const placeholderImage = "/assets/products/catalog-3.jpeg";
 
-const starterProducts: StoreProduct[] = [
-  {
-    id: "smart-hub",
-    name: "Smart Hub V3",
-    sku: "LE-ELE-0001",
-    category: "Electronics",
-    price: 45000,
-    stock: 84,
-    description: "The ultimate central control for your connected home.",
-    image: "/assets/products/catalog-3.jpeg",
-    featured: true,
-  },
-  {
-    id: "pressure-gauge",
-    name: "Pressure Gauge Pro",
-    sku: "LE-HAR-0002",
-    category: "Hardware",
-    price: 12500,
-    stock: 8,
-    description: "A high-precision industrial water pressure monitor.",
-    image: "/assets/products/catalog-1.jpeg",
-    featured: true,
-  },
-  {
-    id: "nightguard",
-    name: "NightGuard Floodlight",
-    sku: "LE-MAI-0003",
-    category: "Maintenance",
-    price: 28000,
-    stock: 36,
-    description: "Wide-angle outdoor lighting with reliable motion sensing.",
-    image: "/assets/products/catalog-2.jpeg",
-    featured: true,
-  },
-  {
-    id: "biolock",
-    name: "BioLock Series X",
-    sku: "LE-SEC-0004",
-    category: "Security",
-    price: 120000,
-    stock: 0,
-    description: "Advanced biometric access control for modern homes.",
-    image: "/assets/products/catalog-5.jpeg",
-    featured: true,
-  },
-];
-
+// Plan tiers and prices; must match Store::PLANS on the backend.
 const plans = [
-  {
-    name: "Basic",
-    price: 25000,
-    features: ["Up to 50 Store Listings", "Standard Analytics", "Email Support"],
-  },
-  {
-    name: "Pro",
-    price: 65000,
-    features: [
-      "Unlimited Listings",
-      "Advanced Data Export",
-      "Priority 24/7 Support",
-      "Custom Domain Integration",
-    ],
-  },
-  {
-    name: "Enterprise",
-    price: 180000,
-    features: [
-      "Multiple Stores Support",
-      "Dedicated Manager",
-      "API Access",
-      "White-label Experience",
-    ],
-  },
+  { name: "Basic", price: 25000, features: ["Up to 50 Store Listings", "Standard Analytics", "Email Support"] },
+  { name: "Pro", price: 65000, features: ["Unlimited Listings", "Advanced Data Export", "Priority 24/7 Support", "Custom Domain Integration"] },
+  { name: "Enterprise", price: 180000, features: ["Multiple Stores Support", "Dedicated Manager", "API Access", "White-label Experience"] },
 ];
-
-const inventoryProducts: StoreProduct[] = [
-  { id: "pureflow", sku: "LE-INV-0042", name: "PureFlow Air X1", category: "Electronics", price: 45000, stock: 84, description: "Air purification system.", image: "/assets/products/inventory-1.jpeg", featured: false },
-  { id: "lumina-chair", sku: "LE-FUR-0081", name: "Lumina Office Chair", category: "Furniture", price: 125000, stock: 8, description: "Ergonomic office chair.", image: "/assets/products/inventory-2.jpeg", featured: false },
-  { id: "earthtone-set", sku: "LE-HME-1029", name: "EarthTone Dinner Set", category: "Homeware", price: 18500, stock: 142, description: "Hand-finished dinnerware set.", image: "/assets/products/inventory-3.jpeg", featured: false },
-];
-const allInitialProducts = [...starterProducts, ...inventoryProducts];
 
 const shellIconFiles = {
   dashboard: ["eb13e4a3-4c6f-430e-acb1-74b1df2ffa56", 18, 18],
@@ -137,183 +62,109 @@ function ShellIcon({ name }: { name: ShellIconName }) {
   return <Image alt="" aria-hidden="true" height={height} src={`/figma/${file}.svg`} unoptimized width={width} />;
 }
 
-function isStoreProduct(value: unknown): value is StoreProduct {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  const product = value as Record<string, unknown>;
-  return (
-    typeof product.id === "string" &&
-    typeof product.name === "string" &&
-    typeof product.sku === "string" &&
-    typeof product.category === "string" &&
-    typeof product.price === "number" &&
-    typeof product.stock === "number" &&
-    typeof product.description === "string" &&
-    typeof product.image === "string" &&
-    typeof product.featured === "boolean"
-  );
-}
-
 type ProductSnapshot = { products: StoreProduct[]; error: string };
-const productSnapshots = new Map<string, ProductSnapshot>();
-const serverProductSnapshots = new Map<string, ProductSnapshot>();
-const productListeners = new Map<string, Set<() => void>>();
+type ProductScope = "owner" | "catalog";
+const SERVER_PRODUCTS: ProductSnapshot = { products: [], error: "" };
+const productSnapshots = new Map<ProductScope, ProductSnapshot>();
+const productListeners = new Map<ProductScope, Set<() => void>>();
 
-function getServerProductSnapshot(key: string, initialProducts: StoreProduct[]) {
-  const cached = serverProductSnapshots.get(key);
-  if (cached) return cached;
-
-  const snapshot = { products: initialProducts, error: "" };
-  serverProductSnapshots.set(key, snapshot);
-  return snapshot;
+function getProductSnapshot(scope: ProductScope): ProductSnapshot {
+  return productSnapshots.get(scope) ?? SERVER_PRODUCTS;
 }
 
-function getProductSnapshot(key: string, initialProducts: StoreProduct[]): ProductSnapshot {
-  const cached = productSnapshots.get(key);
-  if (cached) return cached;
+function publishProducts(scope: ProductScope, snapshot: ProductSnapshot) {
+  productSnapshots.set(scope, snapshot);
+  productListeners.get(scope)?.forEach((listener) => listener());
+}
 
-  if (typeof window === "undefined") {
-    return { products: initialProducts, error: "" };
-  }
+function subscribeToProducts(scope: ProductScope, listener: () => void) {
+  const set = productListeners.get(scope) ?? new Set<() => void>();
+  set.add(listener);
+  productListeners.set(scope, set);
+  return () => { set.delete(listener); };
+}
 
-  let snapshot: ProductSnapshot = { products: initialProducts, error: "" };
+async function loadProducts(scope: ProductScope) {
   try {
-    const saved = window.localStorage.getItem(key);
-    if (saved) {
-      const parsed: unknown = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.every(isStoreProduct)) {
-        snapshot = { products: parsed, error: "" };
-      } else {
-        throw new Error("Saved product data is invalid.");
-      }
-    }
+    const products = await storeFetch<StoreProduct[]>(scope === "owner" ? "/store/products" : "/store/catalog");
+    publishProducts(scope, { products, error: "" });
   } catch (error) {
-    snapshot = {
-      products: initialProducts,
-      error: error instanceof Error ? error.message : "Saved products could not be loaded.",
-    };
+    publishProducts(scope, { products: [], error: error instanceof Error ? error.message : "Products could not be loaded." });
   }
-
-  productSnapshots.set(key, snapshot);
-  return snapshot;
 }
 
-function subscribeToProducts(key: string, listener: () => void) {
-  const listeners = productListeners.get(key) ?? new Set<() => void>();
-  listeners.add(listener);
-  productListeners.set(key, listeners);
-
-  function onStorage(event: StorageEvent) {
-    if (event.key === key || event.key === null) {
-      productSnapshots.delete(key);
-      listener();
-    }
-  }
-
-  window.addEventListener("storage", onStorage);
-  return () => {
-    listeners.delete(listener);
-    window.removeEventListener("storage", onStorage);
-  };
-}
-
-function publishProducts(key: string) {
-  productListeners.get(key)?.forEach((listener) => listener());
-}
-
-export function resetBrowserBusinessData() {
-  window.localStorage.removeItem(registrationStorageKey);
-  window.localStorage.removeItem(planStorageKey);
-  window.localStorage.setItem(productStorageKey, "[]");
-  window.sessionStorage.removeItem(checkoutCustomerStorageKey);
-
-  const emptyProducts: ProductSnapshot = { products: [], error: "" };
-  productSnapshots.set(productStorageKey, emptyProducts);
-  publishProducts(productStorageKey);
-
-  currentPlanSnapshot = serverPlanSnapshot;
-  planLoaded = true;
-  planListeners.forEach((listener) => listener());
-
-  saveSiteSettings(newBusinessSettings);
-}
-
-function useStoreProducts(
-  initialProducts: StoreProduct[] = allInitialProducts,
-  storageKey = productStorageKey,
-) {
+/** Products from the API. "owner" = my store's inventory, "catalog" = everything on sale. */
+function useStoreProducts(scope: ProductScope = "owner") {
   const snapshot = useSyncExternalStore(
-    (listener) => subscribeToProducts(storageKey, listener),
-    () => getProductSnapshot(storageKey, initialProducts),
-    () => getServerProductSnapshot(storageKey, initialProducts),
+    (listener) => subscribeToProducts(scope, listener),
+    () => getProductSnapshot(scope),
+    () => SERVER_PRODUCTS,
   );
-  const setProducts = (
-    update: SetStateAction<StoreProduct[]>,
-  ): string => {
-    const previous = getProductSnapshot(storageKey, initialProducts);
-    const products = typeof update === "function" ? update(previous.products) : update;
-    let error = "";
-    try {
-      window.localStorage.setItem(storageKey, JSON.stringify(products));
-    } catch (saveError) {
-      error = saveError instanceof Error ? saveError.message : "Product changes could not be saved.";
-    }
-    productSnapshots.set(storageKey, { products, error });
-    publishProducts(storageKey);
-    return error;
+  useEffect(() => { void loadProducts(scope); }, [scope]);
+
+  /** Applies the change locally, then syncs the difference (create/update/delete) to the server. */
+  const setProducts = (update: SetStateAction<StoreProduct[]>): string => {
+    const previous = getProductSnapshot(scope).products;
+    const next = typeof update === "function" ? update(previous) : update;
+    publishProducts(scope, { products: next, error: "" });
+
+    void (async () => {
+      try {
+        const known = new Set(previous.map((p) => p.id));
+        const keep = new Set(next.map((p) => p.id));
+        for (const p of previous) {
+          if (!keep.has(p.id)) await storeFetch(`/store/products/${p.id}`, { method: "DELETE" });
+        }
+        for (const p of next) {
+          const body = JSON.stringify({ name: p.name, category: p.category, price: p.price, stock: p.stock, description: p.description, image: p.image, featured: p.featured });
+          if (!known.has(p.id)) await storeFetch("/store/products", { method: "POST", body });
+          else if (JSON.stringify(previous.find((x) => x.id === p.id)) !== JSON.stringify(p)) await storeFetch(`/store/products/${p.id}`, { method: "PUT", body });
+        }
+        await loadProducts(scope);
+      } catch (error) {
+        await loadProducts(scope);
+        publishProducts(scope, { ...getProductSnapshot(scope), error: error instanceof Error ? error.message : "Product changes could not be saved." });
+      }
+    })();
+    return "";
   };
 
   return { products: snapshot.products, setProducts, storageError: snapshot.error };
 }
 
 type PlanSnapshot = { plan: string; error: string };
-const serverPlanSnapshot: PlanSnapshot = { plan: "Pro", error: "" };
+const serverPlanSnapshot: PlanSnapshot = { plan: "Basic", error: "" };
 let currentPlanSnapshot: PlanSnapshot = serverPlanSnapshot;
-let planLoaded = false;
 const planListeners = new Set<() => void>();
 
+function setPlanSnapshot(next: PlanSnapshot) {
+  currentPlanSnapshot = next;
+  planListeners.forEach((listener) => listener());
+}
 function getCurrentPlan(): PlanSnapshot {
-  if (typeof window === "undefined") return serverPlanSnapshot;
-  if (planLoaded) return currentPlanSnapshot;
-
-  try {
-    const saved = window.localStorage.getItem(planStorageKey);
-    if (saved && plans.some((plan) => plan.name === saved)) {
-      currentPlanSnapshot = { plan: saved, error: "" };
-    }
-  } catch (error) {
-    currentPlanSnapshot = {
-      plan: "Pro",
-      error: error instanceof Error ? error.message : "The saved subscription could not be loaded.",
-    };
-  }
-  planLoaded = true;
-
   return currentPlanSnapshot;
 }
-
 function subscribeToPlan(listener: () => void) {
   planListeners.add(listener);
-  function onStorage(event: StorageEvent) {
-    if (event.key === planStorageKey || event.key === null) {
-      planLoaded = false;
-      listener();
-    }
+  return () => { planListeners.delete(listener); };
+}
+async function loadPlan() {
+  try {
+    const me = await storeFetch<{ plan: string } | null>("/store/me");
+    setPlanSnapshot({ plan: me?.plan ?? "Basic", error: me ? "" : "Register your store to choose a plan." });
+  } catch (error) {
+    setPlanSnapshot({ plan: "Basic", error: error instanceof Error ? error.message : "The subscription could not be loaded." });
   }
-  window.addEventListener("storage", onStorage);
-  return () => {
-    planListeners.delete(listener);
-    window.removeEventListener("storage", onStorage);
-  };
+}
+async function updateCurrentPlan(name: string) {
+  const me = await storeFetch<{ plan: string }>("/store/plan", { method: "PUT", body: JSON.stringify({ plan: name }) });
+  setPlanSnapshot({ plan: me.plan, error: "" });
 }
 
-function updateCurrentPlan(name: string) {
-  window.localStorage.setItem(planStorageKey, name);
-  currentPlanSnapshot = { plan: name, error: "" };
-  planLoaded = true;
-  planListeners.forEach((listener) => listener());
+/** Resets the browser-only branding settings. Store data lives on the server and is not touched. */
+export function resetBrowserBusinessData() {
+  window.sessionStorage.removeItem(checkoutCustomerStorageKey);
+  saveSiteSettings(newBusinessSettings);
 }
 
 function formatNaira(value: number) {
@@ -524,21 +375,27 @@ export function AnalyticsScreen() {
 }
 
 export function StoreAvailabilityControl() {
-  const { settings, storageError } = useSiteSettings();
+  const [isOpen, setIsOpen] = useState<boolean | null>(null);
   const [error, setError] = useState("");
 
-  function toggleStoreStatus() {
+  useEffect(() => {
+    storeFetch<{ isOpen: boolean } | null>("/store/me")
+      .then((me) => { setIsOpen(me ? me.isOpen : null); if (!me) setError("Register your store to set its status."); })
+      .catch((e) => setError(e instanceof Error ? e.message : "The store status could not be loaded."));
+  }, []);
+
+  async function toggleStoreStatus() {
+    if (isOpen === null) return;
     try {
-      saveSiteSettings({ ...settings, isStoreOpen: !settings.isStoreOpen });
+      const me = await storeFetch<{ isOpen: boolean }>("/store/me", { method: "PATCH", body: JSON.stringify({ is_open: !isOpen }) });
+      setIsOpen(me.isOpen);
       setError("");
     } catch (saveError) {
-      setError(
-        saveError instanceof Error
-          ? saveError.message
-          : "The store status could not be saved.",
-      );
+      setError(saveError instanceof Error ? saveError.message : "The store status could not be saved.");
     }
   }
+  const settings = { isStoreOpen: isOpen === true };
+  const storageError = "";
 
   return (
     <section
@@ -550,12 +407,12 @@ export function StoreAvailabilityControl() {
       <div className="store-availability-copy">
         <p>STORE STATUS</p>
         <strong>{settings.isStoreOpen ? "Open" : "Closed"}</strong>
-        <small>Status is saved in this browser.</small>
+        <small>Closed stores are hidden from the catalogue.</small>
       </div>
       <button
         aria-label={settings.isStoreOpen ? "Close store" : "Open store"}
         className={`button ${settings.isStoreOpen ? "button--outline store-close-button" : "button--primary"}`}
-        disabled={Boolean(storageError)}
+        disabled={isOpen === null}
         onClick={toggleStoreStatus}
         type="button"
       >
@@ -711,81 +568,9 @@ export function ReportsScreen() {
 }
 
 export function MessagesScreen() {
-  const { settings } = useSiteSettings();
-  const [notice, setNotice] = useState("");
-
-  function contactSupport() {
-    const subject = encodeURIComponent(`${settings.siteName || "Business"} support`);
-    window.location.href = `mailto:${settings.supportEmail}?subject=${subject}`;
-  }
-
   return (
     <StoreShell activeNav="Messages">
-      <div className="screen-title-row">
-        <div>
-          <p className="screen-kicker">WORKSPACE / COMMUNICATIONS</p>
-          <h1>Messages</h1>
-          <p className="form-help">
-            Keep up with customer and estate support conversations.
-          </p>
-        </div>
-        <button
-          className="button button--primary"
-          onClick={contactSupport}
-          type="button"
-        >
-          Compose message
-        </button>
-      </div>
-      {notice && (
-        <div className="screen-notice" role="status">
-          {notice}
-        </div>
-      )}
-      <section className="screen-card messages-card">
-        <div className="screen-card-heading">
-          <div>
-            <h2>Recent conversations</h2>
-            <p>Customer names and messages are sample content.</p>
-          </div>
-          <a className="text-button" href={`mailto:${settings.supportEmail}`}>
-            Contact support
-          </a>
-        </div>
-        <div className="message-list">
-          {[
-            ["CO", "Chinedu Okafor", "Delivery update for Lekki Phase 1", "10:42", true],
-            ["IN", "Ifeoma Nwosu", "Invoice INV-4401 is ready", "Yesterday", false],
-            ["TA", "Tunde Adeyemi", "Question about the estate plan", "Mon", false],
-          ].map(([initials, name, subject, time, unread]) => (
-            <button
-              className="message-row"
-              key={name as string}
-              onClick={() =>
-                setNotice(
-                  `This is a sample conversation with ${name}. Message delivery is not connected.`,
-                )
-              }
-              type="button"
-            >
-              <span className="customer-avatar">{initials}</span>
-              <span className="message-row-copy">
-                <strong>{name}</strong>
-                <small>{subject}</small>
-              </span>
-              <span className="message-time">{time}</span>
-              {unread && <span className="unread-dot" />}
-            </button>
-          ))}
-        </div>
-        <p className="form-help messages-footnote">
-          Live customer messaging is not connected. You can contact the team at{" "}
-          <a href={`mailto:${settings.supportEmail}`}>
-            {settings.supportEmail}
-          </a>
-          .
-        </p>
-      </section>
+      <ChatCenter />
     </StoreShell>
   );
 }
@@ -946,7 +731,7 @@ function ProductEditor({
         description: String(formData.get("description") ?? "").trim(),
         image: photo
           ? await optimizeProductPhoto(photo)
-          : product?.image ?? starterProducts[0].image,
+          : product?.image ?? placeholderImage,
         featured: product?.featured ?? true,
       });
     } catch (error) {
@@ -1008,7 +793,7 @@ async function optimizeProductPhoto(file: File): Promise<string> {
 }
 
 export function ProductCatalogScreen({ initialQuery = "" }: { initialQuery?: string }) {
-  const { products, setProducts, storageError } = useStoreProducts();
+  const { products, setProducts, storageError } = useStoreProducts("catalog");
   const [query, setQuery] = useState(initialQuery);
   const [category, setCategory] = useState("All Categories");
   const [stock, setStock] = useState("All");
@@ -1054,7 +839,7 @@ export function ProductCatalogRoute() {
 
 export function InventoryScreen() {
   const { settings } = useSiteSettings();
-  const { products: allProducts, setProducts, storageError } = useStoreProducts();
+  const { products: allProducts, setProducts, storageError } = useStoreProducts("owner");
   const products = [...allProducts].sort((a, b) => Number(a.featured) - Number(b.featured));
   const [filter, setFilter] = useState("All Stock");
   const [query, setQuery] = useState("");
@@ -1125,6 +910,7 @@ export function StoreRegistrationScreen() {
   const [paymentMethod, setPaymentMethod] = useState("Bank Transfer");
   const [settlementFrequency, setSettlementFrequency] = useState("Monthly");
   const [complete, setComplete] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const steps = ["Store Identity", "Location & Space", "Documents", "Payment Terms"];
 
@@ -1146,15 +932,17 @@ export function StoreRegistrationScreen() {
       event.target.value = "";
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setError("Store logos must be 5 MB or smaller.");
+    if (file.size > 1024 * 1024) {
+      setError("Store logos must be 1 MB or smaller.");
       event.target.value = "";
       return;
     }
 
     setError("");
     setLogoName(file.name);
-    setLogoPreview(URL.createObjectURL(file));
+    const reader = new FileReader();
+    reader.onload = () => setLogoPreview(String(reader.result));
+    reader.readAsDataURL(file);
   }
 
   function next(event: FormEvent<HTMLFormElement>) {
@@ -1166,28 +954,32 @@ export function StoreRegistrationScreen() {
       return;
     }
 
-    try {
-      window.localStorage.setItem(registrationStorageKey, JSON.stringify({
-        ...details,
-        weekends,
-        documents: documentNames,
-        logoName,
-        paymentMethod,
-        settlementFrequency,
-        savedAt: new Date().toISOString(),
-      }));
-      setComplete(true);
-    } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "The registration could not be saved.");
-    }
+    setSubmitting(true);
+    storeFetch("/store/register", {
+      method: "POST",
+      body: JSON.stringify({
+        name: details.name,
+        category: details.category,
+        phone: details.phone,
+        description: details.description,
+        address: [details.address, details.city, details.state, details.zip].filter(Boolean).join(", "),
+        logo: logoPreview.startsWith("data:") ? logoPreview : undefined,
+        open_weekends: weekends,
+        settlement_method: paymentMethod,
+        settlement_frequency: settlementFrequency,
+      }),
+    })
+      .then(() => setComplete(true))
+      .catch((saveError) => setError(saveError instanceof Error ? saveError.message : "The registration could not be saved."))
+      .finally(() => setSubmitting(false));
   }
 
   return <StoreShell><div className="registration-heading"><h1>Register New Store</h1><p>Complete the following steps to onboard a new commercial entity into {settings.siteName || "your business"}.</p></div><div className="stepper">{steps.map((label, index) => <button className={index === step ? "is-current" : index < step ? "is-done" : ""} key={label} onClick={() => { if (index < step) setStep(index); }} type="button"><span>{index < step ? "✓" : `0${index + 1}`}</span>{label}</button>)}</div>
-    {complete ? <section className="registration-success"><span>✓</span><h2>Registration draft saved</h2><p>{details.name} was saved in this browser only. It has not been submitted to {settings.siteName || "your business"}, no one will be contacted, and uploaded files are not sent.</p><div><Link className="button button--primary" href="/store-app/store">Return to Store</Link><Link className="button button--outline" href="/store-app/products">Manage Products</Link></div></section> : <form onSubmit={next}><div className="registration-layout"><div className="registration-forms">{step === 0 && <section className="screen-card registration-card"><h2>General Information</h2><div className="form-grid"><label>Store Name<input name="name" onChange={update} placeholder="e.g. Premium Grocers" required value={details.name} /></label><label>Category<select name="category" onChange={update} value={details.category}><option>Retail &amp; Grocery</option><option>Electronics</option><option>Home &amp; Garden</option><option>Property Services</option><option>Security</option></select></label><label className="form-span">Description<textarea name="description" onChange={update} placeholder="Provide a brief overview of the store’s offerings..." rows={3} value={details.description} /></label><label>Store Manager<input name="manager" onChange={update} placeholder="Full name" required value={details.manager} /></label><label>Contact Number<input name="phone" onChange={update} placeholder="+234 802 555 0148" required type="tel" value={details.phone} /></label></div></section>}
+    {complete ? <section className="registration-success"><span>✓</span><h2>Store registered</h2><p>{details.name} is now registered. Document files are not uploaded yet; only the store details were saved.</p><div><Link className="button button--primary" href="/store-app/store">Return to Store</Link><Link className="button button--outline" href="/store-app/products">Manage Products</Link></div></section> : <form onSubmit={next}><div className="registration-layout"><div className="registration-forms">{step === 0 && <section className="screen-card registration-card"><h2>General Information</h2><div className="form-grid"><label>Store Name<input name="name" onChange={update} placeholder="e.g. Premium Grocers" required value={details.name} /></label><label>Category<select name="category" onChange={update} value={details.category}><option>Retail &amp; Grocery</option><option>Electronics</option><option>Home &amp; Garden</option><option>Property Services</option><option>Security</option></select></label><label className="form-span">Description<textarea name="description" onChange={update} placeholder="Provide a brief overview of the store’s offerings..." rows={3} value={details.description} /></label><label>Store Manager<input name="manager" onChange={update} placeholder="Full name" required value={details.manager} /></label><label>Contact Number<input name="phone" onChange={update} placeholder="+234 802 555 0148" required type="tel" value={details.phone} /></label></div></section>}
       {step === 1 && <section className="screen-card registration-card"><h2>Location &amp; Space</h2><div className="form-grid"><label className="form-span">Street address<input name="address" onChange={update} placeholder="123 Corporate Blvd, Suite 400" required value={details.address} /></label><label>City<input name="city" onChange={update} required value={details.city} /></label><label>State<input name="state" onChange={update} required value={details.state} /></label><label>ZIP code<input name="zip" onChange={update} required value={details.zip} /></label><label>Opening time<input name="opening" onChange={update} required type="time" value={details.opening} /></label><label>Closing time<input name="closing" onChange={update} required type="time" value={details.closing} /></label><label className="toggle-row"><input checked={weekends} onChange={(event) => setWeekends(event.target.checked)} type="checkbox" /> Open on Weekends</label></div></section>}
       {step === 2 && <section className="screen-card registration-card"><h2>Required Documents</h2><p className="form-help">Select your business registration and proof of occupancy. The document names are saved with this local registration draft; file contents are not uploaded.</p><div className="upload-grid">{["Business registration", "Proof of occupancy"].map((label, index) => <label className="upload-field" key={label}>{label}<input accept=".pdf,.png,.jpg,.jpeg" onChange={(event) => { const name = event.target.files?.[0]?.name ?? ""; setDocumentNames((current) => current.map((value, position) => position === index ? name : value)); }} type="file" /><small>{documentNames[index] || "Choose a PDF or image"}</small></label>)}</div></section>}
       {step === 3 && <section className="screen-card registration-card"><h2>Payment Terms</h2><p className="form-help">Choose how settlements should be scheduled for this store.</p><div className="form-grid"><label>Settlement method<select onChange={(event) => setPaymentMethod(event.target.value)} value={paymentMethod}><option>Bank Transfer</option><option>Card</option><option>Mobile Money</option></select></label><label>Settlement frequency<select onChange={(event) => setSettlementFrequency(event.target.value)} value={settlementFrequency}><option>Weekly</option><option>Monthly</option><option>Quarterly</option></select></label><label className="form-span terms-check"><input required type="checkbox" /> I confirm these business details are accurate and agree to the store terms.</label></div></section>}
-      {error && <div className="screen-error" role="alert">{error}</div>}<div className="registration-actions"><Link className="button button--outline" href="/store-app/store">Cancel</Link>{step > 0 && <button className="button button--outline" onClick={() => setStep((current) => current - 1)} type="button">Back</button>}<button className="button button--primary" type="submit">{step === 3 ? "Save registration draft" : "Next Step →"}</button></div></div>
+      {error && <div className="screen-error" role="alert">{error}</div>}<div className="registration-actions"><Link className="button button--outline" href="/store-app/store">Cancel</Link>{step > 0 && <button className="button button--outline" onClick={() => setStep((current) => current - 1)} type="button">Back</button>}<button className="button button--primary" disabled={submitting} type="submit">{step === 3 ? (submitting ? "Registering…" : "Register store") : "Next Step →"}</button></div></div>
       <aside className="registration-aside"><section className="screen-card branding-card"><h2>Store Branding</h2><label className="logo-upload">{logoPreview ? <Image alt="Selected store logo preview" height={56} src={logoPreview} unoptimized width={56} /> : "＋"}<strong>{logoName || "Upload Store Logo"}</strong><small>SVG, PNG OR JPG (MAX 5MB)<input accept="image/*" onChange={updateLogo} type="file" /></small></label><div className="quick-tip"><strong>QUICK TIP</strong><span>The logo preview is local to this browser. File contents are not uploaded to the server.</span></div></section><section className="registration-progress"><strong>Registration Progress</strong><div className="target-track"><span style={{ width: `${(step + 1) * 25}%` }} /></div><span className="progress-percent">{(step + 1) * 25}%</span>{steps.map((item, index) => <span className={index <= step ? "progress-step is-reached" : "progress-step"} key={item}>{index < step ? "✓" : "○"} &nbsp;{item}</span>)}</section></aside></div></form>}
   </StoreShell>;
 }
@@ -1197,28 +989,31 @@ export function SubscriptionScreen() {
   const planSnapshot = useSyncExternalStore(subscribeToPlan, getCurrentPlan, () => serverPlanSnapshot);
   const currentPlan = planSnapshot.plan;
   const [notice, setNotice] = useState("");
+  const [invoices, setInvoices] = useState<string[][]>([]);
 
-  function choosePlan(name: string) {
+  const loadInvoices = () =>
+    storeFetch<{ id: string; date: string; amount: string; status: string }[]>("/store/invoices")
+      .then((rows) => setInvoices(rows.map((r) => [r.id, r.date, r.amount, r.status])))
+      .catch(() => setInvoices([]));
+
+  useEffect(() => { void loadPlan(); void loadInvoices(); }, []);
+
+  async function choosePlan(name: string) {
     try {
-      updateCurrentPlan(name);
-      setNotice(`${name} is saved as your plan preference in this browser. Billing is not connected.`);
+      await updateCurrentPlan(name);
+      await loadInvoices();
+      setNotice(`You are now on the ${name} plan. An invoice was raised; payment is collected separately.`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Your plan could not be updated.");
     }
   }
 
-  return <StoreShell activeNav="Finance"><div className="registration-heading"><h1>Subscription Plans</h1><p>Choose the right tier to scale your estate’s digital storefront.</p></div>{planSnapshot.error && <div className="screen-error" role="alert">Subscription preference could not be loaded: {planSnapshot.error}</div>}{notice && <div className="screen-notice" role="status">{notice}</div>}<p className="form-help">Plan selection is a local preview only. No subscription or recurring charge is created.</p><div className="plan-grid">{plans.map((plan) => <article className={`plan-card${currentPlan === plan.name ? " plan-card--current" : ""}`} key={plan.name}>{currentPlan === plan.name && <span className="current-plan-label">CURRENT PLAN</span>}<span className={`plan-tag plan-tag--${plan.name.toLowerCase()}`}>{plan.name.toUpperCase()}</span><div className="plan-price">{formatNaira(plan.price)}<small>/mo</small></div><ul>{plan.features.map((feature) => <li key={feature}><span>✓</span>{feature}</li>)}</ul>{plan.name === "Enterprise" ? <a className="button button--outline" href={`mailto:${settings.supportEmail}?subject=Enterprise%20Plan`}>Contact Sales</a> : <button aria-pressed={currentPlan === plan.name} className={`button ${currentPlan === plan.name ? "button--primary" : "button--outline"}`} disabled={currentPlan === plan.name} onClick={() => choosePlan(plan.name)} type="button">{currentPlan === plan.name ? "Current plan" : `Switch to ${plan.name}`}</button>}</article>)}</div>
-    <section className="screen-card billing-card"><div className="billing-heading"><div><strong>Sample Billing History</strong><small>Preview invoices only; billing records are not connected to the backend.</small></div><button className="text-button" onClick={() => exportBillingHistory(settings.siteName)} type="button">⇩ Export CSV</button></div><div className="table-scroll"><table><thead><tr><th>Invoice ID</th><th>Date</th><th>Amount</th><th>Status</th><th>Action</th></tr></thead><tbody>{billingHistory.map(([id, date, amount, status]) => <tr key={id}><td><strong>{id}</strong></td><td>{date}</td><td>{amount}</td><td><span className={`order-status order-status--${status.toLowerCase()}`}>{status}</span></td><td><button aria-label={`Download sample invoice ${id}`} className="icon-action" onClick={() => downloadCsv(`${id.replace(/[^a-z0-9-]/gi, "")}.csv`, [["Invoice ID", "Date", "Amount", "Status"], [id, date, amount, status]])} type="button">⇩</button></td></tr>)}</tbody></table></div><div className="table-pagination"><span>3 sample invoices</span><button className="button button--outline" onClick={() => setNotice("Payment method updates are unavailable because a payment provider is not connected.")} type="button">Update payment method</button></div></section>
+  return <StoreShell activeNav="Finance"><div className="registration-heading"><h1>Subscription Plans</h1><p>Choose the right tier to scale your estate’s digital storefront.</p></div>{planSnapshot.error && <div className="screen-error" role="alert">Subscription could not be loaded: {planSnapshot.error}</div>}{notice && <div className="screen-notice" role="status">{notice}</div>}<p className="form-help">Switching plan raises an invoice. No card is charged automatically.</p><div className="plan-grid">{plans.map((plan) => <article className={`plan-card${currentPlan === plan.name ? " plan-card--current" : ""}`} key={plan.name}>{currentPlan === plan.name && <span className="current-plan-label">CURRENT PLAN</span>}<span className={`plan-tag plan-tag--${plan.name.toLowerCase()}`}>{plan.name.toUpperCase()}</span><div className="plan-price">{formatNaira(plan.price)}<small>/mo</small></div><ul>{plan.features.map((feature) => <li key={feature}><span>✓</span>{feature}</li>)}</ul>{plan.name === "Enterprise" ? <a className="button button--outline" href={`mailto:${settings.supportEmail}?subject=Enterprise%20Plan`}>Contact Sales</a> : <button aria-pressed={currentPlan === plan.name} className={`button ${currentPlan === plan.name ? "button--primary" : "button--outline"}`} disabled={currentPlan === plan.name} onClick={() => choosePlan(plan.name)} type="button">{currentPlan === plan.name ? "Current plan" : `Switch to ${plan.name}`}</button>}</article>)}</div>
+    <section className="screen-card billing-card"><div className="billing-heading"><div><strong>Billing History</strong><small>Invoices raised for your store.</small></div><button className="text-button" onClick={() => exportBillingHistory(settings.siteName, invoices)} type="button">⇩ Export CSV</button></div><div className="table-scroll"><table><thead><tr><th>Invoice ID</th><th>Date</th><th>Amount</th><th>Status</th><th>Action</th></tr></thead><tbody>{invoices.map(([id, date, amount, status]) => <tr key={id}><td><strong>{id}</strong></td><td>{date}</td><td>{amount}</td><td><span className={`order-status order-status--${status.toLowerCase()}`}>{status}</span></td><td><button aria-label={`Download invoice ${id}`} className="icon-action" onClick={() => downloadCsv(`${id.replace(/[^a-z0-9-]/gi, "")}.csv`, [["Invoice ID", "Date", "Amount", "Status"], [id, date, amount, status]])} type="button">⇩</button></td></tr>)}</tbody></table></div><div className="table-pagination"><span>{invoices.length} invoice{invoices.length === 1 ? "" : "s"}</span><button className="button button--outline" onClick={() => setNotice("Payment method updates are unavailable because a payment provider is not connected.")} type="button">Update payment method</button></div></section>
   </StoreShell>;
 }
 
-const billingHistory = [
-  ["#INV-2026-001", "12 Jun 2026", "₦129,000", "Paid"],
-  ["#INV-2026-002", "12 May 2026", "₦129,000", "Paid"],
-  ["#INV-2026-003", "12 Apr 2026", "₦129,000", "Failed"],
-];
-
-function exportBillingHistory(businessName: string) {
-  downloadCsv(`${fileSlug(businessName)}-sample-billing-history.csv`, [["Invoice ID", "Date", "Amount", "Status"], ...billingHistory]);
+function exportBillingHistory(businessName: string, invoices: string[][]) {
+  downloadCsv(`${fileSlug(businessName)}-billing-history.csv`, [["Invoice ID", "Date", "Amount", "Status"], ...invoices]);
 }
 
