@@ -81,7 +81,7 @@ export function OutstandingPaymentsTable({
                 {/* Resident */}
                 <td className="py-4 px-5">
                   <Link
-                    href={`/outstanding/resident/${payment.id}`}
+                    href={`/outstanding/resident/${payment.residentId ?? payment.id}`}
                     className="flex items-center gap-3 group/link"
                   >
                     <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 group-hover/link:bg-primary group-hover/link:text-white transition-colors">

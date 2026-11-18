@@ -2,32 +2,20 @@
 
 import React, { useState, useEffect } from "react";
 import { ChevronDown, Check } from "lucide-react";
-import { AwayResidentRecord } from "@/types/admin/away";
-import { residentSelectOptions } from "@/lib/admin/awayData";
+import { AwayResidentRecord, AwaySavePayload, ResidentSelectOption } from "@/types/admin/away";
 import { cn } from "@/lib/admin/utils";
 
 interface LogAwayStatusFormCardProps {
   editingRecord: AwayResidentRecord | null;
   onCancelEdit: () => void;
-  onSaveRecord: (record: Omit<AwayResidentRecord, "id">, editId?: number) => void;
-}
-
-function formatReadableDate(raw: string, fallback: string): string {
-  if (!raw.trim()) return fallback;
-  const parsed = new Date(raw);
-  if (!isNaN(parsed.getTime())) {
-    return parsed.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  }
-  return raw.trim();
+  options: ResidentSelectOption[];
+  onSaveRecord: (payload: AwaySavePayload, editId?: number) => Promise<void>;
 }
 
 export function LogAwayStatusFormCard({
   editingRecord,
   onCancelEdit,
+  options: residentSelectOptions,
   onSaveRecord,
 }: LogAwayStatusFormCardProps) {
   const [selectedResidentLabel, setSelectedResidentLabel] = useState("");
@@ -49,8 +37,8 @@ export function LogAwayStatusFormCard({
           ? matchingOption.label
           : `${editingRecord.resident_name} — ${editingRecord.unit}`
       );
-      setDepartureDate(editingRecord.departure_date);
-      setExpectedReturnDate(editingRecord.expected_return_date);
+      setDepartureDate(editingRecord.departure_iso ?? "");
+      setExpectedReturnDate(editingRecord.expected_return_iso ?? "");
       setContactName(editingRecord.emergency_contact_name || "");
       setContactPhone(editingRecord.emergency_contact_phone || "");
       setNotifySecurity(editingRecord.notify_security);
@@ -69,43 +57,39 @@ export function LogAwayStatusFormCard({
     onCancelEdit();
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const matched = residentSelectOptions.find((o) => o.label === selectedResidentLabel);
+    const residentName = matched?.resident_name ?? editingRecord?.resident_name;
+    const unit = matched?.unit ?? editingRecord?.unit;
+    if (!residentName || !unit) { setFeedbackMsg("Please select a resident."); return; }
+    if (!departureDate || !expectedReturnDate) { setFeedbackMsg("Please enter both dates."); return; }
 
-    const matched = residentSelectOptions.find(
-      (o) => o.label === selectedResidentLabel
-    );
-    const residentName = matched ? matched.resident_name : "Marcus Holloway";
-    const unit = matched ? matched.unit : "Villa A-402";
-    const initials = matched ? matched.initials : "MH";
-
-    onSaveRecord(
-      {
-        initials,
-        resident_name: residentName,
-        unit,
-        departure_date: formatReadableDate(departureDate, "Nov 20, 2023"),
-        expected_return_date: formatReadableDate(
-          expectedReturnDate,
-          "Dec 02, 2023"
-        ),
-        is_overdue: false,
-        status: "away",
-        emergency_contact_name: contactName.trim() || "Emergency Contact",
-        emergency_contact_phone: contactPhone.trim() || "+1 (555) 000-0000",
-        notify_security: notifySecurity,
-        suspend_packages: suspendPackages,
-      },
-      editingRecord?.id
-    );
-
-    setFeedbackMsg(
-      editingRecord
-        ? `Updated away status for ${residentName}.`
-        : `Recorded new away status for ${residentName} (${unit}).`
-    );
-    setTimeout(() => setFeedbackMsg(null), 3500);
-    handleReset();
+    try {
+      await onSaveRecord(
+        {
+          user_id: matched?.user_id ?? editingRecord?.user_id ?? null,
+          resident_name: residentName,
+          unit,
+          departure_date: departureDate,
+          expected_return_date: expectedReturnDate,
+          emergency_contact_name: contactName.trim() || undefined,
+          emergency_contact_phone: contactPhone.trim() || undefined,
+          notify_security: notifySecurity,
+          suspend_packages: suspendPackages,
+        },
+        editingRecord?.id
+      );
+      setFeedbackMsg(
+        editingRecord
+          ? `Updated away status for ${residentName}.`
+          : `Recorded new away status for ${residentName} (${unit}).`
+      );
+      setTimeout(() => setFeedbackMsg(null), 3500);
+      handleReset();
+    } catch (err) {
+      setFeedbackMsg(err instanceof Error ? err.message : "Could not save the away status.");
+    }
   };
 
   return (
@@ -171,7 +155,7 @@ export function LogAwayStatusFormCard({
               Departure Date
             </label>
             <input
-              type="text"
+              type="date"
               value={departureDate}
               onChange={(e) => setDepartureDate(e.target.value)}
               placeholder="mm/dd/yyyy"
@@ -185,7 +169,7 @@ export function LogAwayStatusFormCard({
               Expected Return Date
             </label>
             <input
-              type="text"
+              type="date"
               value={expectedReturnDate}
               onChange={(e) => setExpectedReturnDate(e.target.value)}
               placeholder="mm/dd/yyyy"

@@ -1,16 +1,25 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { StaffMember } from "@/types/admin/staff";
-import { initialStaffsListMembers } from "@/lib/admin/staffData";
+import { staffApi } from "@/lib/admin/staffApi";
 import { StaffsZebraListView } from "@/components/admin/staff/StaffsZebraListView";
 import { EditStaffProfileModal } from "@/components/admin/staff/EditStaffProfileModal";
 import { CreatingStaffOverlayModal } from "@/components/admin/staff/CreatingStaffOverlayModal";
 
 export default function AllStaffsListPage() {
-  const [members, setMembers] = useState<StaffMember[]>(initialStaffsListMembers);
+  const [members, setMembers] = useState<StaffMember[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const reload = useCallback(async () => {
+    try { setMembers(await staffApi.list()); setError(null); }
+    catch (e) { setError(e instanceof Error ? e.message : "Could not load staff."); }
+  }, []);
+  useEffect(() => { void reload(); }, [reload]);
+  const mutate = async (fn: () => Promise<unknown>) => {
+    try { await fn(); await reload(); } catch (e) { setError(e instanceof Error ? e.message : "That change failed."); }
+  };
   const [selectedMember, setSelectedMember] = useState<StaffMember | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -20,31 +29,14 @@ export default function AllStaffsListPage() {
     setIsEditOpen(true);
   };
 
-  const handleCreateStaff = (data: Partial<StaffMember>) => {
-    const newStaff: StaffMember = {
-      id: Date.now(),
-      name: data.name || "New Staff",
-      email: data.email || "staff@lincolnestate.com",
-      role: data.role || "staff",
-      job_title: data.job_title || "Staff",
-      department: data.department || "Operations",
-      staff_id: data.staff_id || "LES001",
-      status: "active",
-      avatar_url: data.avatar_url,
-    };
-    setMembers((prev) => [newStaff, ...prev]);
-  };
+  const handleCreateStaff = (data: Partial<StaffMember>) => { void mutate(() => staffApi.create(data)); };
 
   const handleSaveMember = (data: Partial<StaffMember>) => {
     if (!selectedMember) return;
-    setMembers((prev) =>
-      prev.map((m) => (m.id === selectedMember.id ? { ...m, ...data } : m))
-    );
+    void mutate(() => staffApi.update(selectedMember.id, data));
   };
 
-  const handleConfirmDelete = (id: number) => {
-    setMembers((prev) => prev.filter((m) => m.id !== id));
-  };
+  const handleConfirmDelete = (id: number) => { void mutate(() => staffApi.remove(id)); };
 
   const handleDeleteMember = (member: StaffMember) => {
     if (confirm(`Are you sure you want to remove ${member.name}?`)) {
@@ -54,6 +46,7 @@ export default function AllStaffsListPage() {
 
   return (
     <div className="space-y-5 animate-in fade-in duration-300 pb-12">
+      {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</div>}
       <div className="flex items-center justify-between">
         <Link
           href="/admin/staffs"
@@ -66,7 +59,7 @@ export default function AllStaffsListPage() {
 
       <StaffsZebraListView
         members={members}
-        totalCount={120}
+        totalCount={members.length}
         onEdit={handleOpenEdit}
         onDelete={handleDeleteMember}
         onCreateNewStaff={() => setIsCreateOpen(true)}

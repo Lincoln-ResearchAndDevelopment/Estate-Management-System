@@ -9,12 +9,8 @@ import {
   PlaneLanding,
   ShieldAlert,
 } from "lucide-react";
-import {
-  initialAwayMetrics,
-  initialAwayResidents,
-  initialUpcomingReturns,
-} from "@/lib/admin/awayData";
-import { AwayMetricCard, AwayResidentRecord } from "@/types/admin/away";
+import { useAway } from "@/lib/admin/awayApi";
+import { AwayMetricCard, AwayResidentRecord, AwaySavePayload } from "@/types/admin/away";
 import { LogAwayStatusFormCard } from "./LogAwayStatusFormCard";
 import { CurrentAwayResidentsCard } from "./CurrentAwayResidentsCard";
 import { UpcomingReturnsCard } from "./UpcomingReturnsCard";
@@ -48,10 +44,9 @@ function AwayMetricIcon({
 }
 
 export function AwayNotificationView() {
-  const [metrics, setMetrics] = useState<AwayMetricCard[]>(initialAwayMetrics);
-  const [residents, setResidents] = useState<AwayResidentRecord[]>(
-    initialAwayResidents
-  );
+  const { data: away, error: loadError, save } = useAway();
+  const metrics = away.metrics;
+  const residents = away.residents;
   const [editingRecord, setEditingRecord] =
     useState<AwayResidentRecord | null>(null);
 
@@ -71,27 +66,7 @@ export function AwayNotificationView() {
     }
   };
 
-  const handleSaveRecord = (
-    payload: Omit<AwayResidentRecord, "id">,
-    editId?: number
-  ) => {
-    if (editId) {
-      setResidents((prev) =>
-        prev.map((r) => (r.id === editId ? { ...payload, id: editId } : r))
-      );
-    } else {
-      const created: AwayResidentRecord = {
-        ...payload,
-        id: Date.now(),
-      };
-      setResidents((prev) => [created, ...prev]);
-      setMetrics((prev) =>
-        prev.map((m) =>
-          m.id === "residents-away" ? { ...m, value: m.value + 1 } : m
-        )
-      );
-    }
-  };
+  const handleSaveRecord = (payload: AwaySavePayload, editId?: number) => save(payload, editId);
 
   return (
     <div className="animate-in fade-in duration-300">
@@ -102,6 +77,9 @@ export function AwayNotificationView() {
 
       {/* ================= AUTOMATIC DESKTOP / TABLET LAYOUT (>= 768px) ================= */}
       <div className="hidden md:block space-y-6 pb-6">
+        {loadError && (
+          <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{loadError}</div>
+        )}
         {/* ================= BREADCRUMB & HEADER ROW ================= */}
         <div className="space-y-1.5">
           <nav
@@ -173,6 +151,7 @@ export function AwayNotificationView() {
             <LogAwayStatusFormCard
               editingRecord={editingRecord}
               onCancelEdit={() => setEditingRecord(null)}
+              options={away.options}
               onSaveRecord={handleSaveRecord}
             />
 
@@ -184,7 +163,7 @@ export function AwayNotificationView() {
 
           {/* Right 4 Columns: Upcoming Returns Card */}
           <div className="lg:col-span-4">
-            <UpcomingReturnsCard items={initialUpcomingReturns} />
+            <UpcomingReturnsCard items={away.upcoming} />
           </div>
         </div>
 

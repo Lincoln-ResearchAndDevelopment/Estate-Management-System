@@ -2,13 +2,18 @@
 
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
-import { Search, Bell, Menu } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Search, Menu } from "lucide-react";
+import { NotificationPopover } from "@/components/chat/NotificationPopover";
+import { useChatSummary } from "@/lib/chat/useChatSummary";
 
 interface HeaderProps {
   onMenuToggle: () => void;
 }
 
 export function Header({ onMenuToggle }: HeaderProps) {
+  const router = useRouter();
+  const { summary, refresh } = useChatSummary();
   const [currentTime, setCurrentTime] = useState({
     date: "OCT 24, 2024",
     time: "14:32 PM WAT",
@@ -84,14 +89,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
           <span>OPERATIONAL</span>
         </div>
 
-        {/* Notification Bell */}
-        <button
-          className="relative p-2 rounded-xl text-muted hover:text-dark hover:bg-surface-subtle transition-colors"
-          aria-label="Notifications"
-        >
-          <Bell className="w-5 h-5" />
-          <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-primary" />
-        </button>
+        <NotificationPopover unread={summary.unread_total} onSeeAll={() => router.push("/admin/messages?tab=alerts")} onChanged={refresh} />
 
         {/* User Info & Avatar */}
         <div className="flex items-center gap-3 pl-2 sm:pl-3 border-l border-border/80">

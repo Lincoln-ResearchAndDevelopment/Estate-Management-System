@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -19,13 +19,8 @@ import {
   StaffActivityItem,
   StaffStatus,
 } from "@/types/admin/staff";
-import {
-  initialStaffMembers,
-  initialStaffsListMembers,
-  initialMetrics,
-  initialActivities,
-  initialDepartmentAnalytics,
-} from "@/lib/admin/staffData";
+import { staffApi } from "@/lib/admin/staffApi";
+import type { DepartmentAnalyticsData } from "@/types/admin/staff";
 import { StaffMetricsBar } from "@/components/admin/staff/StaffMetricsBar";
 import { StaffCard } from "@/components/admin/staff/StaffCard";
 import { RecentActivityWidget } from "@/components/admin/staff/RecentActivityWidget";
@@ -35,26 +30,44 @@ import { CreateStaffModal } from "@/components/admin/staff/CreateStaffModal";
 import { StaffFilterBar } from "@/components/admin/staff/StaffFilterBar";
 import { StaffManagementTable } from "@/components/admin/staff/StaffManagementTable";
 import { DepartmentOverviewCard } from "@/components/admin/staff/DepartmentOverviewCard";
-import { PerformanceGoalCard } from "@/components/admin/staff/PerformanceGoalCard";
 import { StaffHorizontalListView } from "@/components/admin/staff/StaffHorizontalListView";
 import { StaffsZebraListView } from "@/components/admin/staff/StaffsZebraListView";
 import { CreatingStaffOverlayModal } from "@/components/admin/staff/CreatingStaffOverlayModal";
 import { cn } from "@/lib/admin/utils";
 
 const PAGE_SIZE = 6;
-const FEATURED_LIST_IDS = [1, 8, 9, 10]; // Bessie Cooper (LES10), Darrell Steward (LES11), Jerome Bell (LES12), Floyd Miles (LES13)
 
 export default function StaffPage() {
   const router = useRouter();
   const [viewMode, setViewMode] = useState<
     "staffs_list" | "list" | "table" | "grid"
   >("staffs_list");
-  const [staffList, setStaffList] = useState<StaffMember[]>(initialStaffMembers);
-  const [zebraStaffList, setZebraStaffList] = useState<StaffMember[]>(
-    initialStaffsListMembers
-  );
-  const [metrics, setMetrics] = useState<StaffMetrics>(initialMetrics);
-  const [activities, setActivities] = useState<StaffActivityItem[]>(initialActivities);
+  const [staffList, setStaffList] = useState<StaffMember[]>([]);
+  const [metrics, setMetrics] = useState<StaffMetrics>({ total_staff: 0, active: 0, active_pct: "0%", suspended: 0, new_joining: 0 });
+  const [deptAnalytics, setDeptAnalytics] = useState<DepartmentAnalyticsData>({ departments: [] });
+  const [activities, setActivities] = useState<StaffActivityItem[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const zebraStaffList = staffList;
+
+  const reload = useCallback(async () => {
+    try {
+      const [list, m, acts] = await Promise.all([staffApi.list(), staffApi.metrics(), staffApi.activities()]);
+      setStaffList(list);
+      const { department_overview, ...counts } = m;
+      setMetrics(counts);
+      setDeptAnalytics(department_overview);
+      setActivities(acts);
+      setLoadError(null);
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "Could not load staff.");
+    }
+  }, []);
+  useEffect(() => { void reload(); }, [reload]);
+
+  // Run an API change, then refresh everything from the server.
+  const mutate = async (fn: () => Promise<unknown>) => {
+    try { await fn(); await reload(); } catch (e) { setLoadError(e instanceof Error ? e.message : "That change failed."); }
+  };
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isSimpleCreateOverlayOpen, setIsSimpleCreateOverlayOpen] = useState(false);
@@ -69,14 +82,8 @@ export default function StaffPage() {
   // Filter for Grid View (Figma Staff 1)
   const [filterActiveOnly, setFilterActiveOnly] = useState(false);
 
-  // Horizontal List View members (Figma "staffs": LES10 - LES13 + any newly added session staff)
-  const horizontalListStaff = useMemo(() => {
-    const newlyCreated = staffList.filter((s) => s.id > 1000);
-    const featured = FEATURED_LIST_IDS.map((id) =>
-      staffList.find((s) => s.id === id)
-    ).filter((s): s is StaffMember => Boolean(s));
-    return [...newlyCreated, ...featured];
-  }, [staffList]);
+  // Horizontal List View: the four most recently added staff
+  const horizontalListStaff = useMemo(() => staffList.slice(0, 4), [staffList]);
 
   // Distinct departments list
   const departments = useMemo(() => {
@@ -104,15 +111,8 @@ export default function StaffPage() {
     return filteredTableStaff.slice(start, start + PAGE_SIZE);
   }, [filteredTableStaff, currentPage]);
 
-  const totalMembersDisplay =
-    selectedDepartment === "all" && selectedStatus === "all"
-      ? 152
-      : filteredTableStaff.length;
-
-  const totalPagesDisplay =
-    selectedDepartment === "all" && selectedStatus === "all"
-      ? 26
-      : Math.max(1, Math.ceil(filteredTableStaff.length / PAGE_SIZE));
+  const totalMembersDisplay = filteredTableStaff.length;
+  const totalPagesDisplay = Math.max(1, Math.ceil(filteredTableStaff.length / PAGE_SIZE));
 
   // Filtered staff list for Card Directory View
   const displayedGridStaff = useMemo(() => {
@@ -142,12 +142,9 @@ export default function StaffPage() {
   };
 
   const handleBulkStatusChange = (status: StaffStatus) => {
-    setStaffList((prev) =>
-      prev.map((member) =>
-        selectedIds.includes(member.id) ? { ...member, status } : member
-      )
-    );
+    const ids = selectedIds;
     setSelectedIds([]);
+    void mutate(() => Promise.all(ids.map((id) => staffApi.update(id, { status }))));
   };
 
   // Staff CRUD handlers
@@ -165,72 +162,18 @@ export default function StaffPage() {
   };
 
   const handleToggleMemberStatus = (member: StaffMember) => {
-    const nextStatus: StaffStatus =
-      member.status === "suspended" ? "active" : "suspended";
-    setStaffList((prev) =>
-      prev.map((s) => (s.id === member.id ? { ...s, status: nextStatus } : s))
-    );
+    const next: StaffStatus = member.status === "suspended" ? "active" : "suspended";
+    void mutate(() => staffApi.update(member.id, { status: next }));
   };
 
   const handleCreateStaff = (data: Partial<StaffMember>) => {
-    const newStaff: StaffMember = {
-      id: Date.now(),
-      name: data.name || "Jonathan Aris",
-      email: data.email || "j.aris@lincolnestate.com",
-      phone: data.phone || "+1 (555) 000-0000",
-      role: data.role || "Property Manager",
-      job_title: data.job_title || "Property Manager",
-      department: data.department || "Leasing Operations",
-      staff_id: data.staff_id || `LES001`,
-      employment_type: data.employment_type || "full_time",
-      status: data.status || "active",
-      avatar_url:
-        data.avatar_url ||
-        `https://ui-avatars.com/api/?name=${encodeURIComponent(
-          data.name || "Jonathan Aris"
-        )}&background=B22222&color=fff&bold=true`,
-    };
-
-    setStaffList([newStaff, ...staffList]);
-    setZebraStaffList([newStaff, ...zebraStaffList]);
     setCurrentPage(1);
-    setMetrics((prev) => ({
-      ...prev,
-      total_staff: prev.total_staff + 1,
-      active: newStaff.status === "active" ? prev.active + 1 : prev.active,
-      new_joining: prev.new_joining + 1,
-    }));
-
-    setActivities([
-      {
-        id: Date.now(),
-        staff_name: "Admin",
-        action_text: "added a new staff member:",
-        target_entity: `${newStaff.name}.`,
-        timestamp_display: "Just now",
-        dot_color: "gold",
-      },
-      ...activities,
-    ]);
+    void mutate(() => staffApi.create(data));
   };
 
   const handleConfirmDelete = (id: number) => {
-    const deleted =
-      staffList.find((s) => s.id === id) ??
-      zebraStaffList.find((s) => s.id === id);
-    setStaffList((prev) => prev.filter((s) => s.id !== id));
-    setZebraStaffList((prev) => prev.filter((s) => s.id !== id));
     setSelectedIds((prev) => prev.filter((selId) => selId !== id));
-    setMetrics((prev) => ({
-      ...prev,
-      total_staff: Math.max(0, prev.total_staff - 1),
-      active:
-        deleted?.status === "active" ? Math.max(0, prev.active - 1) : prev.active,
-      suspended:
-        deleted?.status === "suspended"
-          ? Math.max(0, prev.suspended - 1)
-          : prev.suspended,
-    }));
+    void mutate(() => staffApi.remove(id));
   };
 
   const handleDeleteMember = (member: StaffMember) => {
@@ -241,28 +184,7 @@ export default function StaffPage() {
 
   const handleSaveMember = (data: Partial<StaffMember>) => {
     if (!selectedMember) return;
-
-    setStaffList((prev) =>
-      prev.map((s) => (s.id === selectedMember.id ? { ...s, ...data } : s))
-    );
-    setZebraStaffList((prev) =>
-      prev.map((s) => (s.id === selectedMember.id ? { ...s, ...data } : s))
-    );
-
-    if (data.status && data.status !== selectedMember.status) {
-      setActivities([
-        {
-          id: Date.now(),
-          staff_name: "System alert:",
-          action_text: `${selectedMember.name}'s access credentials`,
-          target_entity:
-            data.status === "suspended" ? "suspended." : "reactivated.",
-          timestamp_display: "Just now",
-          dot_color: data.status === "suspended" ? "red" : "gold",
-        },
-        ...activities,
-      ]);
-    }
+    void mutate(() => staffApi.update(selectedMember.id, data));
   };
 
   // Export Staff to CSV
@@ -310,6 +232,9 @@ export default function StaffPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300 pb-12">
+      {loadError && (
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{loadError}</div>
+      )}
       {/* ================= TOP VIEW & MODULE SWITCHER ================= */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-1.5 p-1.5 bg-surface-card border border-border/70 rounded-2xl w-fit shadow-xs">
@@ -383,7 +308,7 @@ export default function StaffPage() {
       {viewMode === "staffs_list" ? (
         <StaffsZebraListView
           members={zebraStaffList}
-          totalCount={120}
+          totalCount={staffList.length}
           onEdit={handleOpenEdit}
           onDelete={handleDeleteMember}
           onCreateNewStaff={() => setIsSimpleCreateOverlayOpen(true)}
@@ -470,15 +395,8 @@ export default function StaffPage() {
               />
 
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-                <div className="lg:col-span-8">
-                  <DepartmentOverviewCard analytics={initialDepartmentAnalytics} />
-                </div>
-                <div className="lg:col-span-4">
-                  <PerformanceGoalCard
-                    title={initialDepartmentAnalytics.goal.title}
-                    subtitle={initialDepartmentAnalytics.goal.subtitle}
-                    achievedPct={initialDepartmentAnalytics.goal.achieved_pct}
-                  />
+                <div className="lg:col-span-12">
+                  <DepartmentOverviewCard analytics={deptAnalytics} />
                 </div>
               </div>
             </div>

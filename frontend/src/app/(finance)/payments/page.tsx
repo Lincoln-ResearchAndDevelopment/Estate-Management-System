@@ -10,16 +10,21 @@ import { PaymentRecordsTable } from "@/components/payments/PaymentRecordsTable";
 import { PaymentPagination } from "@/components/payments/PaymentPagination";
 import { PaymentRecordsMobileView } from "@/components/payments/mobile/PaymentRecordsMobileView";
 import { PaymentMobileBottomNav } from "@/components/payments/mobile/PaymentMobileBottomNav";
-import { mockPaymentRecords, initialSummaryMetrics } from "@/data/mockPaymentRecords";
+import { ErrorBanner, useFinance } from "@/lib/finance/api";
+import type { PaymentRecord, PaymentSummaryMetrics } from "@/types/paymentRecord";
 import { PaymentFilterState } from "@/types/paymentRecord";
 
 export default function PaymentRecordsPage() {
   const router = useRouter();
-  const [records] = useState(mockPaymentRecords);
-  const [metrics] = useState(initialSummaryMetrics);
+  const { data: recordsRes, error } = useFinance<{ summary: PaymentSummaryMetrics; data: PaymentRecord[] }>(
+    "/payments/records?per_page=100",
+    { summary: { totalRevenue: 0, paidItems: 0, pendingItems: 0, overdueItems: 0 }, data: [] },
+    (j) => j
+  );
+  const records = recordsRes.data;
+  const metrics = recordsRes.summary;
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
-  const totalPages = 128; // Matching Figma 128 pages (1,284 transactions)
 
   const [filters, setFilters] = useState<PaymentFilterState>({
     month: "All Months",
@@ -54,6 +59,9 @@ export default function PaymentRecordsPage() {
     });
   }, [records, filters]);
 
+  const totalPages = Math.max(1, Math.ceil(filteredRecords.length / pageSize));
+  const pageRecords = filteredRecords.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
   const handleClearFilters = () => {
     setFilters({
       month: "All Months",
@@ -66,6 +74,7 @@ export default function PaymentRecordsPage() {
 
   return (
     <>
+      <ErrorBanner message={error} />
       {/* =========================================================================
           1. NATIVE MOBILE VIEW (< 768px): Task 7 Payment Records Mobile
           Automatically displays on any mobile phone or narrow viewport
@@ -138,7 +147,7 @@ export default function PaymentRecordsPage() {
 
         {/* Paginated Payment Records Data Table */}
         <PaymentRecordsTable
-          records={filteredRecords}
+          records={pageRecords}
           onSelectRecord={(r) => router.push(`/payments/receipt/${r.receiptNumber.replace('#', '')}`)}
         />
 
@@ -146,7 +155,7 @@ export default function PaymentRecordsPage() {
         <PaymentPagination
           currentPage={currentPage}
           totalPages={totalPages}
-          totalRecords={1284}
+          totalRecords={filteredRecords.length}
           pageSize={pageSize}
           onPageChange={setCurrentPage}
         />

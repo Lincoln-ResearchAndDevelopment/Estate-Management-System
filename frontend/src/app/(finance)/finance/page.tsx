@@ -9,15 +9,19 @@ import { RevenueBreakdownsTable } from "@/components/finance/RevenueBreakdownsTa
 import { MobileMetricCards } from "@/components/mobile/MobileMetricCards";
 import { MobileRevenueTrends } from "@/components/mobile/MobileRevenueTrends";
 import { MobileTransactionsList } from "@/components/mobile/MobileTransactionsList";
-import { mockFinanceOverview } from "@/data/mockFinanceData";
-import { mockMobileFinanceData } from "@/data/mockMobileFinanceData";
+import { ErrorBanner, useFinance } from "@/lib/finance/api";
+import type { FinanceOverviewData } from "@/types/finance";
+import type { MobileDashboardData as MobileFinanceData } from "@/types/mobileFinance";
 
 export default function FinanceDashboardPage() {
-  const [desktopData] = useState(mockFinanceOverview);
-  const [mobileData] = useState(mockMobileFinanceData);
+  const EMPTY_DESKTOP = { metrics: [], revenueHistory: [], revenueByService: [], breakdowns: [] } as unknown as FinanceOverviewData;
+  const EMPTY_MOBILE = { greetingName: "", metrics: [], trendMonths: [], recentTransactions: [] } as unknown as MobileFinanceData;
+  const { data: desktopData, error: desktopError } = useFinance<{ data: FinanceOverviewData }, FinanceOverviewData>("/finance/overview", EMPTY_DESKTOP);
+  const { data: mobileData, error: mobileError } = useFinance<{ data: MobileFinanceData }, MobileFinanceData>("/finance/mobile-overview", EMPTY_MOBILE);
 
   return (
     <>
+      <ErrorBanner message={desktopError ?? mobileError} />
       {/* =========================================================================
           1. NATIVE MOBILE VIEW (< 768px): Task 3 Finance Mobile Dashboard
           Automatically displays on any mobile phone or narrow viewport

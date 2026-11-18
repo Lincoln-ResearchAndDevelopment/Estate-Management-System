@@ -54,9 +54,11 @@ export function SecuritySummaryCard({ summary }: SecuritySummaryCardProps) {
               </div>
             </div>
 
+            {summary.vehicles_trend && (
             <span className="px-2.5 py-1 rounded-lg text-xs font-extrabold bg-accent-light text-accent">
               {summary.vehicles_trend}
             </span>
+            )}
           </div>
 
           {/* Sub-Card 2: Pedestrians */}
@@ -73,9 +75,11 @@ export function SecuritySummaryCard({ summary }: SecuritySummaryCardProps) {
               </div>
             </div>
 
+            {summary.pedestrians_trend && (
             <span className="px-2.5 py-1 rounded-lg text-xs font-extrabold bg-[#EAECEF] text-dark/80">
               {summary.pedestrians_trend}
             </span>
+            )}
           </div>
 
           {/* Sub-Card 3: ALERTS Box */}

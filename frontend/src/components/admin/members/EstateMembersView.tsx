@@ -1,25 +1,43 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
-import { User, Trash2, RotateCcw } from "lucide-react";
-import {
-  initialEstateMembers,
-  INITIAL_TOTAL_ESTATE_MEMBERS,
-} from "@/lib/admin/memberData";
-import { EstateMemberRecord } from "@/types/admin/member";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { User, Trash2 } from "lucide-react";
+import { adminUsers, type AdminUser } from "@/lib/admin/api";
+import { NewMemberInput } from "@/types/admin/member";
 import { CreatingMemberOverlayModal } from "./CreatingMemberOverlayModal";
 import { cn } from "@/lib/admin/utils";
 
+interface MemberRow { id: number; name: string; house_no: string; date_moved_in: string }
+
+const fmtDate = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("en-GB").replace(/\//g, "-") : "-");
+const toRow = (u: AdminUser): MemberRow => ({
+  id: u.id,
+  name: u.name,
+  house_no: u.unit_number || "-",
+  date_moved_in: fmtDate(u.moved_in_at ?? u.created_at),
+});
+
 export function EstateMembersView() {
-  const [members, setMembers] =
-    useState<EstateMemberRecord[]>(initialEstateMembers);
-  const [totalCount, setTotalCount] = useState<number>(
-    INITIAL_TOTAL_ESTATE_MEMBERS
-  );
+  const [members, setMembers] = useState<MemberRow[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [deletedBackup, setDeletedBackup] =
-    useState<EstateMemberRecord | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await adminUsers.list({ role: "resident", per_page: 100 });
+      setMembers(res.data.map(toRow));
+      setTotalCount(res.meta.total);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load members.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+  useEffect(() => { void load(); }, [load]);
 
   const filteredMembers = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -32,26 +50,25 @@ export function EstateMembersView() {
     );
   }, [members, searchQuery]);
 
-  const handleAddMember = (payload: Omit<EstateMemberRecord, "id">) => {
-    const created: EstateMemberRecord = {
-      ...payload,
-      id: Date.now(),
-    };
-    setMembers((prev) => [created, ...prev]);
-    setTotalCount((prev) => prev + 1);
+  const handleAddMember = async (p: NewMemberInput) => {
+    await adminUsers.create({
+      name: p.name,
+      email: p.email,
+      role: "resident",
+      unit_number: p.house_no || undefined,
+      moved_in_at: p.date_moved_in || undefined,
+    });
+    await load();
   };
 
-  const handleDeleteMember = (record: EstateMemberRecord) => {
-    setDeletedBackup(record);
-    setMembers((prev) => prev.filter((m) => m.id !== record.id));
-    setTotalCount((prev) => Math.max(0, prev - 1));
-  };
-
-  const handleUndoDelete = () => {
-    if (!deletedBackup) return;
-    setMembers((prev) => [deletedBackup, ...prev]);
-    setTotalCount((prev) => prev + 1);
-    setDeletedBackup(null);
+  const handleDeleteMember = async (record: MemberRow) => {
+    if (!window.confirm(`Remove ${record.name} from the estate? This deletes their account.`)) return;
+    try {
+      await adminUsers.remove(record.id);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not remove the member.");
+    }
   };
 
   return (
@@ -84,21 +101,8 @@ export function EstateMembersView() {
         </button>
       </div>
 
-      {/* Optional Undo Toast Banner after deleting a row */}
-      {deletedBackup && (
-        <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-accent-light/65 border border-accent/40 text-dark text-xs sm:text-sm font-semibold">
-          <span>
-            Removed <strong>{deletedBackup.name}</strong> ({deletedBackup.house_no}).
-          </span>
-          <button
-            type="button"
-            onClick={handleUndoDelete}
-            className="inline-flex items-center gap-1.5 text-primary font-extrabold hover:underline"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            Undo
-          </button>
-        </div>
+      {error && (
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</div>
       )}
 
       {/* ================= LOWER TABLE CARD: LIST OF MEMBERS ================= */}
@@ -146,7 +150,7 @@ export function EstateMembersView() {
                     colSpan={4}
                     className="py-10 text-center text-sm text-muted font-medium"
                   >
-                    No estate members match &ldquo;{searchQuery}&rdquo;.
+                    {loading ? "Loading members…" : searchQuery ? <>No estate members match &ldquo;{searchQuery}&rdquo;.</> : "No estate members yet."}
                   </td>
                 </tr>
               ) : (
@@ -192,7 +196,7 @@ export function EstateMembersView() {
         <div className="sm:hidden divide-y divide-border/60 border-t border-border/60">
           {filteredMembers.length === 0 ? (
             <div className="py-8 px-4 text-center text-xs text-muted font-medium">
-              No estate members match &ldquo;{searchQuery}&rdquo;.
+              {loading ? "Loading members…" : searchQuery ? <>No estate members match &ldquo;{searchQuery}&rdquo;.</> : "No estate members yet."}
             </div>
           ) : (
             filteredMembers.map((member, index) => {

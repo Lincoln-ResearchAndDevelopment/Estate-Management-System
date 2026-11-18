@@ -4,6 +4,7 @@ export type OutstandingStatus = "overdue" | "pending" | "partial";
 
 export interface OutstandingPayment {
   id: string;
+  residentId?: string;
   residentName: string;
   residentAvatar?: string;
   propertyAddress: string;

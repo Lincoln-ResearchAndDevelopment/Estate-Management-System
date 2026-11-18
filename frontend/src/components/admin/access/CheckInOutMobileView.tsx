@@ -12,10 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import {
-  mobileAccessMetrics,
-  initialMobileAccessLogs,
-} from "@/lib/admin/accessData";
+import { useAccessOverview } from "@/lib/admin/accessApi";
 import {
   AccessGate,
   MobileAccessBadgeType,
@@ -88,6 +85,7 @@ const PAGE_SIZE = 3;
 export function CheckInOutMobileView({
   isStandalonePreview = false,
 }: CheckInOutMobileViewProps) {
+  const { data: access, error: loadError } = useAccessOverview("today");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedBadge, setSelectedBadge] = useState<
     MobileAccessBadgeType | "All"
@@ -98,7 +96,7 @@ export function CheckInOutMobileView({
 
   const filteredLogs = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    return initialMobileAccessLogs.filter((item) => {
+    return access.mobileLogs.filter((item) => {
       const matchesBadge =
         selectedBadge === "All" || item.badge_type === selectedBadge;
       const matchesGate =
@@ -111,14 +109,14 @@ export function CheckInOutMobileView({
         item.gate.toLowerCase().includes(q);
       return matchesBadge && matchesGate && matchesQuery;
     });
-  }, [searchQuery, selectedBadge, selectedGate]);
+  }, [access.mobileLogs, searchQuery, selectedBadge, selectedGate]);
 
   const paginatedLogs = useMemo(() => {
     const start = (currentPage - 1) * PAGE_SIZE;
     return filteredLogs.slice(start, start + PAGE_SIZE);
   }, [filteredLogs, currentPage]);
 
-  const totalPages = 12;
+  const totalPages = Math.max(1, Math.ceil(filteredLogs.length / PAGE_SIZE));
 
   const handleExportCSV = () => {
     const headers = [
@@ -170,9 +168,13 @@ export function CheckInOutMobileView({
         </p>
       </div>
 
+      {loadError && (
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-semibold text-red-700">{loadError}</div>
+      )}
+
       {/* ================= 4 STACKED HORIZONTAL METRIC CARDS ================= */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-        {mobileAccessMetrics.map((metric) => (
+        {access.metrics.map((metric) => (
           <div
             key={metric.id}
             className="bg-surface-card rounded-2xl border border-border/80 px-5 py-4 shadow-2xs flex items-center justify-between gap-4"

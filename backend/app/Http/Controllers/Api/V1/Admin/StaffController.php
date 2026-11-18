@@ -26,33 +26,25 @@ class StaffController extends Controller
             ->count();
         $newJoining = User::where('status', 'pending')->count();
 
+        $staffRoles = ['admin', 'super_admin', 'staff', 'manager', 'agent', 'maintenance', 'security', 'counsel', 'lead'];
+        $byDept = User::whereIn('role', $staffRoles)->whereNotNull('department')
+            ->selectRaw('department, count(*) as c')->groupBy('department')->orderByDesc('c')->get();
+
         return response()->json([
             'status' => 'success',
             'data' => [
-                'total_staff' => $totalStaff > 0 ? $totalStaff : 124,
-                'total_trend' => '+4%',
-                'active' => $activeStaff > 0 ? $activeStaff : 118,
-                'active_pct' => '95%',
-                'suspended' => $suspendedStaff > 0 ? $suspendedStaff : 4,
-                'suspended_diff' => '-2',
-                'new_joining' => $newJoining > 0 ? $newJoining : 2,
-                'new_joining_badge' => 'New',
+                'total_staff' => $totalStaff,
+                'active' => $activeStaff,
+                'active_pct' => $totalStaff > 0 ? round($activeStaff / $totalStaff * 100).'%' : '0%',
+                'suspended' => $suspendedStaff,
+                'new_joining' => $newJoining,
                 'department_overview' => [
-                    'retention_rate' => '94.2%',
-                    'avg_tenure' => '3.4 Yrs',
-                    'hiring_target' => '82%',
-                    'departments' => [
-                        ['code' => 'OPS', 'label' => 'Leasing & Ops', 'count' => 52, 'percentage' => 86],
-                        ['code' => 'FIN', 'label' => 'Finance', 'count' => 28, 'percentage' => 64],
-                        ['code' => 'MAINT', 'label' => 'Maintenance', 'count' => 38, 'percentage' => 76],
-                        ['code' => 'LEGAL', 'label' => 'Legal', 'count' => 18, 'percentage' => 48],
-                        ['code' => 'HR', 'label' => 'Human Resources', 'count' => 16, 'percentage' => 42],
-                    ],
-                    'goal' => [
-                        'title' => 'Performance Goal',
-                        'subtitle' => 'Q3 Operational Excellence',
-                        'achieved_pct' => 78,
-                    ],
+                    'departments' => $byDept->map(fn ($d) => [
+                        'code' => strtoupper(substr(preg_replace('/[^A-Za-z]/', '', $d->department), 0, 5)),
+                        'label' => $d->department,
+                        'count' => (int) $d->c,
+                        'percentage' => $totalStaff > 0 ? (int) round($d->c / $totalStaff * 100) : 0,
+                    ])->values(),
                 ],
             ],
         ]);
@@ -104,78 +96,13 @@ class StaffController extends Controller
      */
     public function show(int $id): JsonResponse
     {
-        $user = User::find($id);
+        $user = User::findOrFail($id);
 
         return response()->json([
             'status' => 'success',
             'data' => [
                 'staff' => $user,
-                'home_address' => '422 Oakwood Dr, Maplewood, NJ 07040',
-                'join_date' => 'Oct 12, 2021',
-                'reports_to' => [
-                    'name' => 'Sarah Jenkins',
-                    'avatar_url' => 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=200&q=80',
-                ],
-                'annual_leave_used' => 14,
-                'annual_leave_total' => 20,
-                'performance_year' => 2024,
-                'performance' => [
-                    ['month' => 'JAN', 'value' => 86],
-                    ['month' => 'FEB', 'value' => 92],
-                    ['month' => 'MAR', 'value' => 78],
-                    ['month' => 'APR', 'value' => 95, 'is_highlighted' => true],
-                    ['month' => 'MAY', 'value' => 88],
-                    ['month' => 'JUN', 'value' => 90],
-                ],
-                'duties' => [
-                    [
-                        'id' => 'duty-1',
-                        'title' => 'The Grandview Residences',
-                        'subtitle' => 'Primary Site Management & Inspection',
-                        'frequency' => 'DAILY',
-                        'icon' => 'building',
-                    ],
-                    [
-                        'id' => 'duty-2',
-                        'title' => 'Q2 Quarterly Audit',
-                        'subtitle' => 'Financial Compliance Verification',
-                        'frequency' => 'URGENT',
-                        'icon' => 'file',
-                    ],
-                    [
-                        'id' => 'duty-3',
-                        'title' => 'Tenant Liaison',
-                        'subtitle' => 'Dispute resolution & lease renewals',
-                        'frequency' => 'WEEKLY',
-                        'icon' => 'handshake',
-                    ],
-                ],
-                'documents' => [
-                    [
-                        'id' => 'doc-1',
-                        'filename' => 'Employment_Contract.pdf',
-                        'meta_text' => 'Signed: Oct 11, 2021',
-                        'kind' => 'pdf',
-                    ],
-                    [
-                        'id' => 'doc-2',
-                        'filename' => 'Identity_Verification.png',
-                        'meta_text' => 'Expires: Dec 2026',
-                        'kind' => 'id',
-                    ],
-                    [
-                        'id' => 'doc-3',
-                        'filename' => 'Tax_Compliance_2023.pdf',
-                        'meta_text' => 'Status: Verified',
-                        'kind' => 'verified',
-                    ],
-                    [
-                        'id' => 'doc-4',
-                        'filename' => 'Performance_Review_Q1.pdf',
-                        'meta_text' => 'Last updated 2w ago',
-                        'kind' => 'doc',
-                    ],
-                ],
+                'join_date' => $user->created_at?->format('M d, Y'),
             ],
         ]);
     }
@@ -194,7 +121,7 @@ class StaffController extends Controller
             'department' => 'nullable|string|max:100',
             'staff_id' => 'nullable|string|max:50',
             'employment_type' => ['nullable', Rule::in(['full_time', 'contract'])],
-            'status' => ['nullable', Rule::in(['active', 'suspended', 'pending', 'inactive'])],
+            'status' => ['nullable', Rule::in(['active', 'suspended', 'pending', 'inactive', 'on_leave'])],
             'avatar_url' => 'nullable|string',
         ]);
 
@@ -244,7 +171,7 @@ class StaffController extends Controller
             'role' => 'nullable|string|max:50',
             'department' => 'nullable|string|max:100',
             'staff_id' => 'nullable|string|max:50',
-            'status' => ['sometimes', Rule::in(['active', 'suspended', 'pending', 'inactive'])],
+            'status' => ['sometimes', Rule::in(['active', 'suspended', 'pending', 'inactive', 'on_leave'])],
             'avatar_url' => 'nullable|string',
         ]);
 

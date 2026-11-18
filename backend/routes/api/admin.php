@@ -6,6 +6,10 @@ use App\Http\Controllers\Api\V1\Admin\ReminderController;
 use App\Http\Controllers\Api\V1\Admin\EstateUpdateController;
 use App\Http\Controllers\Api\V1\Admin\UserController;
 use App\Http\Controllers\Api\V1\Admin\StaffController;
+use App\Http\Controllers\Api\V1\Admin\AccessController;
+use App\Http\Controllers\Api\V1\Admin\AwayController;
+use App\Http\Controllers\Api\V1\Admin\VehicleController;
+use App\Http\Controllers\Api\V1\Admin\ReportsController;
 
 /*
 |--------------------------------------------------------------------------
@@ -37,6 +41,25 @@ Route::prefix('v1')->group(function () {
         Route::patch('users/{id}/toggle-status', [UserController::class, 'toggleStatus']);
         Route::post('users/{id}/reset-password', [UserController::class, 'resetPassword']);
         Route::apiResource('users', UserController::class);
+
+        // Check-in / check-out monitoring
+        Route::get('reports', [ReportsController::class, 'index']);
+        Route::get('access', [AccessController::class, 'index']);
+
+        // Away notifications
+        Route::get('away', [AwayController::class, 'index']);
+        Route::post('away', [AwayController::class, 'store']);
+        Route::put('away/{id}', [AwayController::class, 'update']);
+        Route::post('away/{id}/returned', [AwayController::class, 'markReturned']);
+
+        // Vehicles & gate scanners
+        Route::get('vehicles', [VehicleController::class, 'index']);
+        Route::post('vehicles', [VehicleController::class, 'store']);
+        Route::patch('vehicles/{id}', [VehicleController::class, 'update']);
+        Route::delete('vehicles/{id}', [VehicleController::class, 'destroy']);
+        Route::post('scanners', [VehicleController::class, 'storeScanner']);
+        Route::patch('scanners/{id}', [VehicleController::class, 'updateScanner']);
+        Route::post('scanners/{id}/ping', [VehicleController::class, 'pingScanner']);
 
         // Staff Management (Task 4 & 5)
         Route::get('staff/metrics', [StaffController::class, 'metrics']);

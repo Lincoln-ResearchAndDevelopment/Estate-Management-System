@@ -1,10 +1,10 @@
 "use client";
 
-import { MoreVertical, Building2, Wifi, Car } from "lucide-react";
+import { MoreVertical, Building2, Wifi, Car, User } from "lucide-react";
 import { cn } from "@/lib/security/utils";
 
-export type WatchlistType = "organisation" | "network" | "vehicle";
-export type WatchlistRisk = "Level 5 (Red)" | "Level 3 (Amber)" | "Level 1 (Grey)";
+export type WatchlistType = "organisation" | "network" | "vehicle" | "person";
+export type WatchlistRisk = "Level 5 (Red)" | "Level 4 (Orange)" | "Level 3 (Amber)" | "Level 2 (Yellow)" | "Level 1 (Grey)";
 
 export interface WatchlistAccount {
   id: string;
@@ -16,18 +16,22 @@ export interface WatchlistAccount {
   linkedUnit?: string;
   accessNode?: string;
   vehicle?: string;
-  action: "Review Ledger" | "Isolate Port" | "Track Movement";
+  action: "Review Ledger" | "Isolate Port" | "Track Movement" | "Review Profile";
 }
 
 const RISK_COLOR: Record<WatchlistRisk, string> = {
   "Level 5 (Red)":   "text-[--color-danger]",
+  "Level 4 (Orange)":"text-orange-500",
   "Level 3 (Amber)": "text-[--color-warning]",
+  "Level 2 (Yellow)":"text-yellow-600",
   "Level 1 (Grey)":  "text-gray-500",
 };
 
 const RISK_BAR: Record<WatchlistRisk, string> = {
   "Level 5 (Red)":   "bg-[--color-danger] w-full",
+  "Level 4 (Orange)":"bg-orange-500 w-5/6",
   "Level 3 (Amber)": "bg-[--color-warning] w-2/3",
+  "Level 2 (Yellow)":"bg-yellow-500 w-1/2",
   "Level 1 (Grey)":  "bg-gray-400 w-1/4",
 };
 
@@ -35,12 +39,14 @@ const ACTION_STYLES: Record<WatchlistAccount["action"], string> = {
   "Review Ledger":  "border border-[--color-primary] text-[--color-primary] hover:bg-[--color-primary-light]",
   "Isolate Port":   "border border-[--color-danger]  text-[--color-danger]  hover:bg-[--color-danger-light]",
   "Track Movement": "border border-[--color-primary] text-[--color-primary] hover:bg-[--color-primary-light]",
+  "Review Profile": "border border-[--color-primary] text-[--color-primary] hover:bg-[--color-primary-light]",
 };
 
 const TYPE_ICON: Record<WatchlistType, React.ReactNode> = {
   organisation: <Building2 className="w-5 h-5 text-[--color-text-muted]" />,
   network:      <Wifi      className="w-5 h-5 text-[--color-danger]"      />,
   vehicle:      <Car       className="w-5 h-5 text-[--color-text-muted]"  />,
+  person:       <User      className="w-5 h-5 text-[--color-text-muted]"  />,
 };
 
 interface Props {

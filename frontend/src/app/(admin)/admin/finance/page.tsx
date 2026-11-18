@@ -1,6 +1,6 @@
-import { UnderConstruction } from "@/components/admin/layout/UnderConstruction";
+import { redirect } from "next/navigation";
 
-export default function FinancePage() {
-  return <UnderConstruction moduleName="Finance" />;
+// Finance lives in its own workspace (payments, outstanding, analytics, services, reports).
+export default function AdminFinanceRedirect() {
+  redirect("/finance");
 }
-

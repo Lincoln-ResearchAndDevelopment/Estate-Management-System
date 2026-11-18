@@ -3,12 +3,12 @@
 import React, { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import { ImageIcon } from "lucide-react";
-import { EstateMemberRecord } from "@/types/admin/member";
+import { NewMemberInput } from "@/types/admin/member";
 
 interface CreatingMemberOverlayModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddMember: (payload: Omit<EstateMemberRecord, "id">) => void;
+  onAddMember: (payload: NewMemberInput) => Promise<void>;
 }
 
 export function CreatingMemberOverlayModal({
@@ -19,6 +19,8 @@ export function CreatingMemberOverlayModal({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [saving, setSaving] = useState(false);
   const [houseNo, setHouseNo] = useState("");
   const [dateMovedIn, setDateMovedIn] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string>("");
@@ -28,6 +30,7 @@ export function CreatingMemberOverlayModal({
   useEffect(() => {
     if (isOpen) {
       setFullName("");
+      setEmail("");
       setHouseNo("");
       setDateMovedIn("");
       setAvatarUrl("");
@@ -51,29 +54,30 @@ export function CreatingMemberOverlayModal({
     reader.readAsDataURL(file);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName.trim()) {
       setErrorMsg("Please enter the member's Full Name.");
       return;
     }
-
-    const cleanName = fullName.trim();
-    const cleanHouseNo = houseNo.trim() || "EHN145";
-    const cleanDate = dateMovedIn.trim() || "23-10-210";
-
-    onAddMember({
-      name: cleanName,
-      house_no: cleanHouseNo,
-      date_moved_in: cleanDate,
-      avatar_url:
-        avatarUrl ||
-        `https://ui-avatars.com/api/?name=${encodeURIComponent(
-          cleanName
-        )}&background=B22222&color=fff&bold=true`,
-    });
-
-    onClose();
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
+      setErrorMsg("Please enter a valid email address.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await onAddMember({
+        name: fullName.trim(),
+        email: email.trim(),
+        house_no: houseNo.trim(),
+        date_moved_in: dateMovedIn.trim(),
+      });
+      onClose();
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Could not add the member.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const inputBaseClass =
@@ -121,6 +125,18 @@ export function CreatingMemberOverlayModal({
             />
           </div>
 
+          {/* 1b. Email (needed to create the login) */}
+          <div>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Email"
+              aria-label="Email"
+              className={inputBaseClass}
+            />
+          </div>
+
           {/* 2. House No */}
           <div>
             <input
@@ -136,9 +152,9 @@ export function CreatingMemberOverlayModal({
           {/* 3. Date Moved In */}
           <div>
             <input
-              type="text"
               value={dateMovedIn}
               onChange={(e) => setDateMovedIn(e.target.value)}
+              type="date"
               placeholder="Date Moved In"
               aria-label="Date Moved In"
               className={inputBaseClass}
@@ -192,6 +208,7 @@ export function CreatingMemberOverlayModal({
 
             <button
               type="submit"
+              disabled={saving}
               className="min-w-[150px] sm:min-w-[200px] px-8 py-3.5 rounded-2xl bg-primary hover:bg-primary-hover text-white text-base sm:text-2xl font-medium shadow-sm transition-all active:scale-98 text-center"
             >
               Add Member

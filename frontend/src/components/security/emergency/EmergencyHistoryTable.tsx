@@ -8,7 +8,7 @@ export interface HistoryRow {
   id: string;
   date: string;
   time: string;
-  alertType: "Fire Alarm" | "Intrusion Sensor" | "Medical" | "Suspicious Activity";
+  alertType: "Fire Alarm" | "Intrusion Sensor" | "Medical" | "Suspicious Activity" | "Life Threat" | "Intelligence";
   resident: string;
   location: string;
   status: "Resolved" | "Investigating" | "Pending" | "Escalated";
@@ -19,6 +19,8 @@ const TYPE_ICON: Record<HistoryRow["alertType"], React.ReactNode> = {
   "Intrusion Sensor":    <Shield className="w-3.5 h-3.5 text-blue-500"   />,
   "Medical":             <Heart  className="w-3.5 h-3.5 text-[--color-danger]" />,
   "Suspicious Activity": <Eye    className="w-3.5 h-3.5 text-yellow-500" />,
+  "Life Threat":         <Heart  className="w-3.5 h-3.5 text-[--color-danger]" />,
+  "Intelligence":        <Eye    className="w-3.5 h-3.5 text-yellow-500" />,
 };
 
 const STATUS_STYLES: Record<HistoryRow["status"], string> = {

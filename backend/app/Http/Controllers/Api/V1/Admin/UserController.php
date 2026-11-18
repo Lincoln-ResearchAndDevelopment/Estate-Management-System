@@ -26,12 +26,10 @@ class UserController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => [
-                'total_users' => $totalUsers > 0 ? $totalUsers : 2450,
-                'total_users_trend' => '+12%',
-                'pending_approval' => $pendingApprovals > 0 ? $pendingApprovals : 12,
-                'blocked_accounts' => $blockedAccounts > 0 ? $blockedAccounts : 4,
-                'active_staff' => $activeStaff > 0 ? $activeStaff : 86,
-                'active_staff_trend' => '+3',
+                'total_users' => $totalUsers,
+                'pending_approval' => $pendingApprovals,
+                'blocked_accounts' => $blockedAccounts,
+                'active_staff' => $activeStaff,
             ],
         ]);
     }
@@ -105,6 +103,7 @@ class UserController extends Controller
             'role' => ['required', Rule::in(['super_admin', 'admin', 'security', 'resident', 'staff', 'manager', 'agent', 'maintenance'])],
             'status' => ['nullable', Rule::in(['active', 'inactive', 'suspended', 'pending'])],
             'unit_number' => 'nullable|string|max:100',
+            'moved_in_at' => 'nullable|date',
             'job_title' => 'nullable|string|max:150',
             'staff_id' => 'nullable|string|max:50',
             'password' => 'nullable|string|min:8',
@@ -123,6 +122,7 @@ class UserController extends Controller
             'role' => $validated['role'],
             'status' => $validated['status'] ?? 'active',
             'unit_number' => $validated['unit_number'] ?? null,
+            'moved_in_at' => $validated['moved_in_at'] ?? null,
             'job_title' => $validated['job_title'] ?? null,
             'staff_id' => $staffId,
             'password' => Hash::make($validated['password'] ?? 'LincolnEstate2024!'),

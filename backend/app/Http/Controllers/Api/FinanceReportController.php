@@ -69,36 +69,18 @@ class FinanceReportController extends Controller
                 ],
                 'usageMetrics' => [
                     'title' => 'Report Usage Metrics',
-                    'subtitle' => 'Total reports generated this month across all modules.',
-                    'totalDownloads' => 1248,
-                    'barHeights' => [38, 60, 92, 54, 38],
+                    'subtitle' => 'Total reports generated this month across all templates.',
+                    'totalDownloads' => \App\Models\ReportExport::where('created_at', '>=', now()->startOfMonth())->count(),
+                    'barHeights' => $this->weeklyBars(),
                 ],
-                'recentExports' => [
-                    [
-                        'id' => 'EXP-01',
-                        'fileName' => 'Monthly_Tax_Summary_Oct.pdf',
-                        'generatedBy' => 'Admin_Sarah_V',
-                        'dateTime' => 'Oct 24, 2023 • 02:15 PM',
-                        'format' => 'PDF',
-                        'downloadUrl' => '/storage/exports/Monthly_Tax_Summary_Oct.pdf',
-                    ],
-                    [
-                        'id' => 'EXP-02',
-                        'fileName' => 'Resident_Ledger_Q3.xlsx',
-                        'generatedBy' => 'System_Auto',
-                        'dateTime' => 'Oct 23, 2023 • 09:00 AM',
-                        'format' => 'XLSX',
-                        'downloadUrl' => '/storage/exports/Resident_Ledger_Q3.xlsx',
-                    ],
-                    [
-                        'id' => 'EXP-03',
-                        'fileName' => 'Outstanding_Payments_All_Zones.pdf',
-                        'generatedBy' => 'Admin_John_D',
-                        'dateTime' => 'Oct 21, 2023 • 11:45 AM',
-                        'format' => 'PDF',
-                        'downloadUrl' => '/storage/exports/Outstanding_Payments_All_Zones.pdf',
-                    ],
-                ],
+                'recentExports' => \App\Models\ReportExport::latest('id')->limit(5)->get()->map(fn ($e) => [
+                    'id' => 'EXP-'.str_pad((string) $e->id, 2, '0', STR_PAD_LEFT),
+                    'fileName' => $e->file_name,
+                    'generatedBy' => \App\Models\User::find($e->generated_by)?->name ?? 'System',
+                    'dateTime' => $e->created_at?->format('M d, Y • h:i A'),
+                    'format' => strtoupper($e->format),
+                    'downloadUrl' => \Illuminate\Support\Facades\Storage::disk('public')->url($e->path),
+                ])->values(),
             ],
         ]);
     }
@@ -108,27 +90,97 @@ class FinanceReportController extends Controller
      *
      * Generates a PDF or XLSX report for a template or custom filter set.
      */
+    /** Exports in the last 5 weeks, scaled 0-100 for the usage bars. */
+    private function weeklyBars(): array
+    {
+        $counts = [];
+        for ($w = 4; $w >= 0; $w--) {
+            $from = now()->subWeeks($w)->startOfWeek();
+            $counts[] = \App\Models\ReportExport::whereBetween('created_at', [$from, $from->copy()->endOfWeek()])->count();
+        }
+        $max = max(1, max($counts));
+        return array_map(fn ($c) => (int) round($c / $max * 100), $counts);
+    }
+
+    /** Rows (header first) for each report template. */
+    private function rows(string $template, ?string $service, ?string $status): array
+    {
+        $today = now()->toDateString();
+        switch ($template) {
+            case 'resident-payment-report':
+                $rows = [['Receipt', 'Resident', 'Unit', 'Service', 'Amount (NGN)', 'Method', 'Paid at']];
+                foreach (\App\Models\Payment::with(['user', 'invoice'])->where('status', 'success')->latest('paid_at')->get() as $p) {
+                    if ($service && $service !== 'All Services' && $p->invoice?->service_name !== $service) continue;
+                    $rows[] = [$p->reference, $p->user?->name, $p->user?->unit_number, $p->invoice?->service_name, $p->amount_kobo / 100, $p->method, $p->paid_at];
+                }
+                return $rows;
+            case 'outstanding-payment-report':
+                $rows = [['Invoice', 'Resident', 'Unit', 'Service', 'Balance (NGN)', 'Due date', 'Status']];
+                foreach (\App\Models\Invoice::with('user')->whereColumn('paid_kobo', '<', 'amount_kobo')->orderBy('due_date')->get() as $i) {
+                    if ($service && $service !== 'All Services' && $i->service_name !== $service) continue;
+                    $rows[] = [$i->reference, $i->user?->name, $i->user?->unit_number, $i->service_name, $i->balanceKobo() / 100, $i->due_date->toDateString(), $i->state()];
+                }
+                return $rows;
+            case 'service-report':
+                $rows = [['Service', 'Billed (NGN)', 'Collected (NGN)', 'Balance (NGN)', 'Collection rate %']];
+                foreach (\App\Models\Invoice::selectRaw('service_name, sum(amount_kobo) b, sum(paid_kobo) p')->groupBy('service_name')->get() as $r) {
+                    $rows[] = [$r->service_name, $r->b / 100, $r->p / 100, ($r->b - $r->p) / 100, $r->b > 0 ? round($r->p / $r->b * 100, 1) : 0];
+                }
+                return $rows;
+            case 'yearly-report':
+                $rows = [['Year', 'Collected (NGN)']];
+                for ($y = now()->year - 4; $y <= now()->year; $y++) {
+                    $rows[] = [$y, \App\Models\Payment::where('status', 'success')->whereYear('paid_at', $y)->sum('amount_kobo') / 100];
+                }
+                return $rows;
+            default: // monthly-report
+                $rows = [['Month', 'Collected (NGN)', 'Billed (NGN)']];
+                for ($m = 1; $m <= 12; $m++) {
+                    $from = now()->startOfYear()->month($m)->startOfMonth(); $to = $from->copy()->endOfMonth();
+                    $rows[] = [$from->format('M Y'),
+                        \App\Models\Payment::where('status', 'success')->whereBetween('paid_at', [$from, $to])->sum('amount_kobo') / 100,
+                        \App\Models\Invoice::whereBetween('issued_on', [$from->toDateString(), $to->toDateString()])->sum('amount_kobo') / 100];
+                }
+                return $rows;
+        }
+    }
+
     public function export(Request $request): JsonResponse
     {
-        $validated = $request->validate([
-            'template_id' => 'required|string',
-            'format'      => 'required|in:PDF,XLSX',
+        $v = $request->validate([
+            'template_id' => 'required|in:monthly-report,yearly-report,service-report,resident-payment-report,outstanding-payment-report',
+            'format'      => 'required|in:CSV,PDF,XLSX',
             'month'       => 'nullable|string',
             'year'        => 'nullable|string',
             'service'     => 'nullable|string',
             'area'        => 'nullable|string',
             'status'      => 'nullable|string',
         ]);
+        if ($v['format'] !== 'CSV') {
+            return response()->json(['status' => 'error', 'message' => 'Only CSV export is available right now. Choose CSV.'], 422);
+        }
+
+        $fh = fopen('php://temp', 'r+');
+        foreach ($this->rows($v['template_id'], $v['service'] ?? null, $v['status'] ?? null) as $row) {
+            fputcsv($fh, array_map(fn ($c) => $c instanceof \DateTimeInterface ? $c->format('Y-m-d H:i') : $c, $row));
+        }
+        rewind($fh);
+        $csv = stream_get_contents($fh);
+        fclose($fh);
+
+        $name = str_replace('-', '_', $v['template_id']).'_'.now()->format('Ymd_His').'.csv';
+        $path = 'exports/'.$name;
+        \Illuminate\Support\Facades\Storage::disk('public')->put($path, $csv);
+        $export = \App\Models\ReportExport::create([
+            'template_id' => $v['template_id'], 'file_name' => $name, 'format' => 'CSV', 'path' => $path, 'generated_by' => $request->user()?->id,
+        ]);
 
         return response()->json([
-            'status' => 'success',
-            'message' => 'Report generated successfully.',
+            'status' => 'success', 'message' => 'Report generated successfully.',
             'export' => [
-                'id' => 'EXP-' . rand(100, 999),
-                'fileName' => ucfirst(str_replace('-', '_', $validated['template_id'])) . '.' . strtolower($validated['format']),
-                'generatedBy' => 'Admin_Profile',
-                'dateTime' => now()->format('M d, Y • h:i A'),
-                'format' => $validated['format'],
+                'id' => 'EXP-'.str_pad((string) $export->id, 2, '0', STR_PAD_LEFT), 'fileName' => $name,
+                'generatedBy' => $request->user()?->name ?? 'System', 'dateTime' => now()->format('M d, Y • h:i A'),
+                'format' => 'CSV', 'downloadUrl' => \Illuminate\Support\Facades\Storage::disk('public')->url($path),
             ],
         ], 201);
     }

@@ -1,9 +1,5 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import React from "react";
-import { ResidentFinanceSummaryView } from "@/components/resident-finance/ResidentFinanceSummaryView";
-import { mockResidentFinanceSummary } from "@/data/mockResidentFinance";
-
-export default function ResidentFinanceSummaryPage() {
-  return <ResidentFinanceSummaryView data={mockResidentFinanceSummary} />;
+export default function ResidentFinanceIndexPage() {
+  redirect("/outstanding");
 }

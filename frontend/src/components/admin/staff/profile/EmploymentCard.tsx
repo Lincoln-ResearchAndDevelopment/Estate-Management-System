@@ -8,9 +8,9 @@ interface EmploymentCardProps {
   employeeId: string;
   joinDate: string;
   department: string;
-  reportsTo: { name: string; avatar_url: string };
-  leaveUsed: number;
-  leaveTotal: number;
+  reportsTo?: { name: string; avatar_url: string };
+  leaveUsed?: number;
+  leaveTotal?: number;
 }
 
 export function EmploymentCard({
@@ -21,7 +21,8 @@ export function EmploymentCard({
   leaveUsed,
   leaveTotal,
 }: EmploymentCardProps) {
-  const pct = Math.min(100, Math.round((leaveUsed / (leaveTotal || 1)) * 100));
+  const hasLeave = leaveTotal !== undefined && leaveUsed !== undefined;
+  const pct = hasLeave ? Math.min(100, Math.round((leaveUsed! / (leaveTotal || 1)) * 100)) : 0;
 
   return (
     <div className="bg-surface-card rounded-2xl p-5 sm:p-6 border border-border/80 shadow-card h-full flex flex-col">
@@ -43,6 +44,7 @@ export function EmploymentCard({
           <dt className="text-[10px] font-bold text-muted uppercase tracking-wider">Department</dt>
           <dd className="text-sm sm:text-base font-semibold text-dark mt-1">{department}</dd>
         </div>
+        {reportsTo && (
         <div>
           <dt className="text-[10px] font-bold text-muted uppercase tracking-wider">Reports To</dt>
           <dd className="flex items-center gap-2 mt-1 min-w-0">
@@ -52,9 +54,11 @@ export function EmploymentCard({
             <span className="text-sm font-semibold text-dark truncate">{reportsTo.name}</span>
           </dd>
         </div>
+        )}
       </dl>
 
       {/* Leave balance */}
+      {hasLeave && (
       <div className="mt-auto pt-5">
         <div className="rounded-xl bg-surface-subtle border border-border p-4">
           <div className="flex items-center justify-between text-xs font-bold">
@@ -74,6 +78,7 @@ export function EmploymentCard({
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

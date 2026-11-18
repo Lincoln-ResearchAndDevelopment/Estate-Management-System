@@ -9,39 +9,17 @@ import {
   CheckCircle2,
   X,
 } from "lucide-react";
-import {
-  initialMobileAwayMetrics,
-  initialMobileActiveAwayLogs,
-} from "@/lib/admin/awayData";
+import { useAway } from "@/lib/admin/awayApi";
 import {
   MobileAwayMetric,
   MobileActiveAwayLogItem,
   MobileAwayLogStatus,
 } from "@/types/admin/away";
 
-function formatShortDateRange(fromStr: string, toStr: string): string {
-  const formatPart = (raw: string, fallback: string) => {
-    const trimmed = raw.trim();
-    if (!trimmed) return fallback;
-    const parsed = new Date(trimmed);
-    if (!isNaN(parsed.getTime())) {
-      return parsed.toLocaleDateString("en-US", {
-        month: "short",
-        day: "2-digit",
-      });
-    }
-    return trimmed;
-  };
-  return `${formatPart(fromStr, "Oct 24")} - ${formatPart(toStr, "Nov 05")}`;
-}
-
 export function AwayNotificationMobileView() {
-  const [metrics, setMetrics] = useState<MobileAwayMetric[]>(
-    initialMobileAwayMetrics
-  );
-  const [logs, setLogs] = useState<MobileActiveAwayLogItem[]>(
-    initialMobileActiveAwayLogs
-  );
+  const { data: away, error: loadError, save } = useAway();
+  const metrics = away.mobileMetrics;
+  const logs = away.mobileLogs;
   const [showAllLogs, setShowAllLogs] = useState(false);
 
   // Quick Log form state
@@ -97,65 +75,38 @@ export function AwayNotificationMobileView() {
     }, 250);
   };
 
-  const handleSubmitQuickLog = (e: React.FormEvent) => {
+  const handleSubmitQuickLog = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanName = residentName.trim() || "John Doe";
-    const rawUnit = unitNumber.trim() || "B-14";
-    const formattedUnit = /^unit\s+/i.test(rawUnit)
-      ? rawUnit
-      : `Unit ${rawUnit}`;
-    const formattedNotes = notes.trim()
-      ? notes.trim().startsWith("Contact:") || notes.trim().startsWith("Notes:")
-        ? notes.trim()
-        : `Notes: ${notes.trim()}`
-      : "Contact: N/A";
-
-    const dateRange = formatShortDateRange(fromDate, toDate);
-
-    if (editingId !== null) {
-      setLogs((prev) =>
-        prev.map((item) =>
-          item.id === editingId
-            ? {
-                ...item,
-                resident_name: cleanName,
-                unit: formattedUnit,
-                status,
-                date_range: dateRange,
-                from_date: fromDate,
-                to_date: toDate,
-                footer_note: formattedNotes,
-              }
-            : item
-        )
-      );
-      setToastMessage(`Updated away log for ${cleanName}.`);
-    } else {
-      const newLog: MobileActiveAwayLogItem = {
-        id: Date.now(),
-        resident_name: cleanName,
-        unit: formattedUnit,
-        status: "AWAY",
-        date_range: dateRange,
-        from_date: fromDate,
-        to_date: toDate,
-        footer_note: formattedNotes,
-      };
-      setLogs((prev) => [newLog, ...prev]);
-      setMetrics((prev) =>
-        prev.map((m) =>
-          m.id === "currently-away" ? { ...m, value: m.value + 1 } : m
-        )
-      );
-      setToastMessage(`Logged away status for ${cleanName}.`);
+    const cleanName = residentName.trim();
+    const unit = unitNumber.trim().replace(/^unit\s+/i, "");
+    if (!cleanName || !unit || !fromDate || !toDate) {
+      setToastMessage("Enter the resident, unit and both dates.");
+      return;
     }
-
-    resetForm();
+    try {
+      await save(
+        {
+          resident_name: cleanName,
+          unit: `Unit ${unit}`,
+          departure_date: fromDate,
+          expected_return_date: toDate,
+          notes: notes.trim() || undefined,
+        },
+        editingId ?? undefined
+      );
+      setToastMessage(editingId !== null ? `Updated away log for ${cleanName}.` : `Logged away status for ${cleanName}.`);
+      resetForm();
+    } catch (err) {
+      setToastMessage(err instanceof Error ? err.message : "Could not save the away log.");
+    }
     setTimeout(() => setToastMessage(null), 3500);
   };
 
   return (
     <div className="w-full space-y-5 animate-in fade-in duration-300 pb-8">
+      {loadError && (
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-semibold text-red-700">{loadError}</div>
+      )}
       {/* ================= PAGE HEADER & PRIMARY CTA ================= */}
       <div className="space-y-4">
         <div>

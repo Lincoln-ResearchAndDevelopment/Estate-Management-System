@@ -7,13 +7,20 @@ import { ServiceKpiCards } from "@/components/services/ServiceKpiCards";
 import { ServiceDirectoryCard } from "@/components/services/ServiceDirectoryCard";
 import { ServiceInsightsRow } from "@/components/services/ServiceInsightsRow";
 import { AddServiceModal } from "@/components/services/AddServiceModal";
-import { mockServiceManagementData } from "@/data/mockServicesData";
-import { EstateServiceItem, ServiceStatus } from "@/types/serviceManagement";
+import { ErrorBanner, financeFetch, useFinance } from "@/lib/finance/api";
+import { EstateServiceItem, ServiceManagementData, ServiceStatus } from "@/types/serviceManagement";
 
 export default function ServiceManagementPage() {
-  const [services, setServices] = useState<EstateServiceItem[]>(
-    mockServiceManagementData.services
+  const { data, error, reload } = useFinance<{ data: ServiceManagementData }, ServiceManagementData>(
+    "/finance/services",
+    {
+      kpis: { totalServices: 0, activeServices: 0, inactiveServices: 0, expectedRevenue: "₦0.00" },
+      services: [],
+      forecastText: "",
+      quickTipText: "",
+    }
   );
+  const services = data.services;
   const [statusFilter, setStatusFilter] = useState<"All" | ServiceStatus>(
     "All"
   );
@@ -49,53 +56,75 @@ export default function ServiceManagementPage() {
     setIsModalOpen(true);
   };
 
-  const handleSaveService = (
+  const handleSaveService = async (
     serviceData: Omit<EstateServiceItem, "id" | "dateCreated">
   ) => {
-    if (editingService) {
-      setServices((prev) =>
-        prev.map((item) =>
-          item.id === editingService.id ? { ...item, ...serviceData } : item
-        )
-      );
-      showToast(`Updated "${serviceData.name}" successfully.`);
-    } else {
-      const newService: EstateServiceItem = {
-        id: `SRV-${Date.now()}`,
-        ...serviceData,
-        dateCreated: "Nov 11, 2024",
-      };
-      setServices((prev) => [newService, ...prev]);
-      showToast(`Added "${serviceData.name}" to the Service Directory.`);
+    try {
+      if (editingService) {
+        await financeFetch(`/finance/services/${editingService.id}`, {
+          method: "PUT",
+          body: JSON.stringify(serviceData),
+        });
+        showToast(`Updated "${serviceData.name}" successfully.`);
+      } else {
+        await financeFetch("/finance/services", {
+          method: "POST",
+          body: JSON.stringify(serviceData),
+        });
+        showToast(`Added "${serviceData.name}" to the Service Directory.`);
+      }
+      setIsModalOpen(false);
+      await reload();
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Could not save the service.");
     }
-    setIsModalOpen(false);
   };
 
-  const handleDeleteService = (id: string) => {
+  const handleDeleteService = async (id: string) => {
     const target = services.find((s) => s.id === id);
-    setServices((prev) => prev.filter((s) => s.id !== id));
-    if (target) {
-      showToast(`Removed "${target.name}" from Service Directory.`);
+    try {
+      await financeFetch(`/finance/services/${id}`, { method: "DELETE" });
+      if (target) showToast(`Removed "${target.name}" from Service Directory.`);
+      await reload();
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Could not remove the service.");
     }
   };
 
-  const handleToggleStatus = (service: EstateServiceItem) => {
+  const handleToggleStatus = async (service: EstateServiceItem) => {
     const nextStatus: ServiceStatus =
       service.status === "Active" ? "Inactive" : "Active";
-    setServices((prev) =>
-      prev.map((item) =>
-        item.id === service.id ? { ...item, status: nextStatus } : item
-      )
-    );
-    showToast(`Changed "${service.name}" status to ${nextStatus}.`);
+    try {
+      await financeFetch(`/finance/services/${service.id}`, {
+        method: "PUT",
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      showToast(`Changed "${service.name}" status to ${nextStatus}.`);
+      await reload();
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Could not change the status.");
+    }
   };
 
   const handleExportCsv = () => {
-    showToast("Service Directory exported to CSV successfully.");
+    const esc = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
+    const rows = [
+      ["ID", "Name", "Category", "Fee", "Frequency", "Status"],
+      ...filteredServices.map((x) => [x.id, x.name, x.category, x.fee, x.frequency, x.status]),
+    ];
+    const blob = new Blob([rows.map((r) => r.map(esc).join(",")).join("\n")], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "service-directory.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast("Service Directory exported to CSV.");
   };
 
   return (
     <div className="space-y-6 pb-8">
+      <ErrorBanner message={error} />
       {/* 1. Header Row */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -135,7 +164,7 @@ export default function ServiceManagementPage() {
       )}
 
       {/* 2. Top Row: 4 KPI Summary Cards */}
-      <ServiceKpiCards kpis={mockServiceManagementData.kpis} />
+      <ServiceKpiCards kpis={data.kpis} />
 
       {/* 3. Middle Section: Service Directory Table / Mobile Cards */}
       <ServiceDirectoryCard
@@ -152,8 +181,8 @@ export default function ServiceManagementPage() {
 
       {/* 4. Bottom Section: Revenue Forecast & Quick Tip */}
       <ServiceInsightsRow
-        forecastText={mockServiceManagementData.forecastText}
-        quickTipText={mockServiceManagementData.quickTipText}
+        forecastText={data.forecastText}
+        quickTipText={data.quickTipText}
       />
 
       {/* 5. Footer */}
