@@ -22,7 +22,7 @@ export interface Session {
 export const ROLE_HOME: Record<LoginRole, string> = {
   Admin: "/admin",
   Agent: "/agent-portal",
-  User: "/finance",
+  User: "/resident",
   Security: "/security/dashboard",
   "Store Owner": "/store-app",
 };
