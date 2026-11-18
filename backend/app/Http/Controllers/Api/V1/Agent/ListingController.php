@@ -60,8 +60,9 @@ class ListingController extends Controller
             'availability' => ['required', Rule::in(Listing::AVAILABILITY)],
         ])['availability'];
         $listing->save();
+        $fee = in_array($listing->availability, ['rented', 'sold'], true) ? PortalController::onRented($listing) : null;
 
-        return response()->json(['status' => 'success', 'data' => $listing]);
+        return response()->json(['status' => 'success', 'data' => $listing, 'commission' => $fee ? $fee / 100 : null]);
     }
 
     public function destroy(Request $request, int $id): JsonResponse
