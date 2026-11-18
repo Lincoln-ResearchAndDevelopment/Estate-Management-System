@@ -7,10 +7,8 @@ import { OutstandingSummaryCards } from "@/components/outstanding/OutstandingSum
 import { OutstandingFilterToolbar } from "@/components/outstanding/OutstandingFilterToolbar";
 import { OutstandingPaymentsTable } from "@/components/outstanding/OutstandingPaymentsTable";
 import { OutstandingMobileView } from "@/components/outstanding/OutstandingMobileView";
-import {
-  mockOutstandingPayments,
-  mockOutstandingSummary,
-} from "@/data/mockOutstandingPayments";
+import { ErrorBanner, financeFetch, useFinance } from "@/lib/finance/api";
+import type { OutstandingPayment, OutstandingSummaryMetrics } from "@/types/outstanding";
 import { OutstandingFilterState } from "@/types/outstanding";
 
 export default function OutstandingPaymentsPage() {
@@ -21,9 +19,19 @@ export default function OutstandingPaymentsPage() {
   });
 
   const [reminderSent, setReminderSent] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const { data: outstanding, error: loadError, reload } = useFinance<
+    { data: OutstandingPayment[]; summary: OutstandingSummaryMetrics }
+  >(
+    "/payments/outstanding?per_page=100",
+    { data: [], summary: { totalOutstanding: 0, overdueCount: 0, pendingCount: 0, partialCount: 0 } },
+    (j) => j
+  );
+  const outstandingRows = outstanding.data;
+  const outstandingSummary = outstanding.summary;
 
   const filteredPayments = useMemo(() => {
-    let result = [...mockOutstandingPayments];
+    let result = [...outstandingRows];
 
     // Filter by service type
     if (filters.serviceType !== "All Services") {
@@ -51,20 +59,35 @@ export default function OutstandingPaymentsPage() {
     });
 
     return result;
-  }, [filters]);
+  }, [filters, outstandingRows]);
 
-  const handleSendReminder = (id: string) => {
-    setReminderSent(id);
-    setTimeout(() => setReminderSent(null), 3000);
+  const handleSendReminder = async (id: string) => {
+    try {
+      await financeFetch(`/payments/outstanding/${id}/remind`, { method: "POST" });
+      setActionError(null);
+      setReminderSent(id);
+      setTimeout(() => setReminderSent(null), 3000);
+      void reload();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Could not send the reminder.");
+    }
   };
 
-  const handleSendBulkReminders = () => {
-    setReminderSent("bulk");
-    setTimeout(() => setReminderSent(null), 3000);
+  const handleSendBulkReminders = async () => {
+    try {
+      await financeFetch("/payments/outstanding/remind-all", { method: "POST", body: JSON.stringify({}) });
+      setActionError(null);
+      setReminderSent("bulk");
+      setTimeout(() => setReminderSent(null), 3000);
+      void reload();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Could not send the reminders.");
+    }
   };
 
   return (
     <>
+      <ErrorBanner message={loadError ?? actionError} />
       {/* ─── MOBILE VIEW (<768px) ─── */}
       <div className="block md:hidden space-y-5">
         {/* Mobile Page Header */}
@@ -96,8 +119,8 @@ export default function OutstandingPaymentsPage() {
         {/* Mobile Card List */}
         <OutstandingMobileView
           payments={filteredPayments}
-          totalOutstanding={mockOutstandingSummary.totalOutstanding}
-          overdueCount={mockOutstandingSummary.overdueCount}
+          totalOutstanding={outstandingSummary.totalOutstanding}
+          overdueCount={outstandingSummary.overdueCount}
           onSendReminder={handleSendReminder}
         />
       </div>
@@ -151,7 +174,7 @@ export default function OutstandingPaymentsPage() {
         )}
 
         {/* Summary Cards */}
-        <OutstandingSummaryCards metrics={mockOutstandingSummary} />
+        <OutstandingSummaryCards metrics={outstandingSummary} />
 
         {/* Filter Toolbar */}
         <div className="rounded-2xl border border-slate-100 bg-white px-5 py-4 shadow-sm">

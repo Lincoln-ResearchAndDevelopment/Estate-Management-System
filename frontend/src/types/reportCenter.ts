@@ -38,7 +38,7 @@ export interface RecentExportItem {
   fileName: string;
   generatedBy: string;
   dateTime: string;
-  format: "PDF" | "XLSX";
+  format: "PDF" | "XLSX" | "CSV";
   downloadUrl: string;
 }
 

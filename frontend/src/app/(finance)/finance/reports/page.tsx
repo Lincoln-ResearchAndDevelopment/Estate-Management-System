@@ -5,15 +5,19 @@ import { FileBarChart2, Upload, CheckCircle2 } from "lucide-react";
 import { ReportFilterBar } from "@/components/reports/ReportFilterBar";
 import { ReportCardsGrid } from "@/components/reports/ReportCardsGrid";
 import { RecentExportsTable } from "@/components/reports/RecentExportsTable";
-import { mockReportCenterData } from "@/data/mockReportCenterData";
+import { ErrorBanner, financeFetch, useFinance } from "@/lib/finance/api";
 import {
   ReportFilterState,
   ReportTemplateCard,
   RecentExportItem,
+  ReportCenterData,
 } from "@/types/reportCenter";
 
 export default function FinanceReportCenterPage() {
-  const [data, setData] = useState(mockReportCenterData);
+  const { data, error, reload } = useFinance<{ data: ReportCenterData }, ReportCenterData>(
+    "/finance/reports",
+    { templates: [], usageMetrics: { title: "Report Usage Metrics", subtitle: "", totalDownloads: 0, barHeights: [0, 0, 0, 0, 0] }, recentExports: [] }
+  );
   const [filters, setFilters] = useState<ReportFilterState>({
     month: "Current Month",
     year: "2024",
@@ -40,7 +44,7 @@ export default function FinanceReportCenterPage() {
     );
   };
 
-  const handleExportTemplate = (
+  const handleExportTemplate = async (
     tpl: ReportTemplateCard,
     format: "PDF" | "XLSX" | "PRINT"
   ) => {
@@ -48,36 +52,28 @@ export default function FinanceReportCenterPage() {
       window.print();
       return;
     }
-
-    const ext = format === "PDF" ? "pdf" : "xlsx";
-    const generatedName = `${tpl.title.replace(/\s+/g, "_")}_${filters.year}.${ext}`;
-    const newItem: RecentExportItem = {
-      id: `EXP-${Date.now()}`,
-      fileName: generatedName,
-      generatedBy: "Admin_Profile",
-      dateTime: "Just now",
-      format,
-      downloadUrl: `#${generatedName}`,
-    };
-
-    setData((prev) => ({
-      ...prev,
-      usageMetrics: {
-        ...prev.usageMetrics,
-        totalDownloads: prev.usageMetrics.totalDownloads + 1,
-      },
-      recentExports: [newItem, ...prev.recentExports],
-    }));
-
-    triggerToast(`Generated & downloaded ${generatedName} (${format}).`);
+    try {
+      // Only CSV is generated for now, whichever button was pressed.
+      const res = await financeFetch<{ export: RecentExportItem }>("/finance/reports/export", {
+        method: "POST",
+        body: JSON.stringify({ template_id: tpl.id, format: "CSV", service: filters.service, status: filters.status }),
+      });
+      await reload();
+      triggerToast(`Generated ${res.export.fileName} (CSV${format !== "PDF" ? "" : "; PDF is not available yet"}).`);
+      if (res.export.downloadUrl) window.open(res.export.downloadUrl, "_blank");
+    } catch (e) {
+      triggerToast(e instanceof Error ? e.message : "Could not generate the report.");
+    }
   };
 
   const handleDownloadRecent = (item: RecentExportItem) => {
+    if (item.downloadUrl) window.open(item.downloadUrl, "_blank");
     triggerToast(`Downloading ${item.fileName}...`);
   };
 
   return (
     <div className="relative space-y-6 pb-12">
+      <ErrorBanner message={error} />
       {/* 1. Header Row */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>

@@ -1,33 +1,37 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { useParams } from "next/navigation";
 import { DesktopReceipt } from "@/components/receipt/DesktopReceipt";
 import { MobileReceipt } from "@/components/receipt/MobileReceipt";
-import { mockDesktopReceipt, mockMobileReceipt } from "@/data/mockReceiptData";
+import { ErrorBanner, useFinance } from "@/lib/finance/api";
+import type { PaymentReceiptData } from "@/types/receipt";
 
 export default function DynamicPaymentReceiptPage() {
   const params = useParams();
-  const id = (params?.id as string) || "RE-2023-88421";
+  const id = decodeURIComponent((params?.id as string) || "").replace(/^#/, "");
 
-  const [desktopData] = useState({
-    ...mockDesktopReceipt,
-    receiptNumber: id.startsWith("RE-") ? id : `#REC-${id}`,
-  });
+  const { data, error, loading } = useFinance<{ data: PaymentReceiptData }, PaymentReceiptData | null>(
+    `/payments/receipt/${encodeURIComponent(id)}`,
+    null
+  );
 
-  const [mobileData] = useState({
-    ...mockMobileReceipt,
-    receiptNumber: id.startsWith("#") ? id : `#${id}`,
-  });
+  if (!data) {
+    return (
+      <div className="p-6">
+        <ErrorBanner message={error} />
+        {loading && !error && <p className="text-sm text-slate-500">Loading receipt…</p>}
+      </div>
+    );
+  }
 
   return (
     <>
       <div className="block md:hidden">
-        <MobileReceipt receipt={mobileData} />
+        <MobileReceipt receipt={data} />
       </div>
-
       <div className="hidden md:block">
-        <DesktopReceipt receipt={desktopData} />
+        <DesktopReceipt receipt={data} />
       </div>
     </>
   );
