@@ -136,7 +136,7 @@ export default function EstatePage() {
         {data && <Pagination {...data.meta} onPageChange={(page) => update({ page })} />}
       </Card>
 
-      <Modal open={!!editing} onClose={() => setEditing(null)} title={editing === "new" ? "Add unit" : `Edit ${editing && editing !== "new" ? editing.code : ""}`}
+      <Modal open={!!editing} onClose={() => setEditing(null)} title={editing === "new" ? "Add unit" : `Edit ${editing?.code ?? ""}`}
         footer={<><Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button><Button onClick={saveUnit} loading={unitForm.formState.isSubmitting}>Save unit</Button></>}>
         <form onSubmit={saveUnit} noValidate className="grid gap-4 sm:grid-cols-2">
           <Field label="House number" htmlFor="unit_code" error={unitForm.formState.errors.unit_code?.message} required><Input id="unit_code" {...unitForm.register("unit_code")} /></Field>

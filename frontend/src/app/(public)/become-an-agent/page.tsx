@@ -34,7 +34,7 @@ export default function BecomeAgentPage() {
   const [error, setError] = useState<string | null>(null);
   const { register, control, handleSubmit, setError: setFieldError, formState: { errors, isSubmitting } } = useForm<Values>({
     resolver: zodResolver(schema),
-    defaultValues: { phone: "+234", id_document: null, profile_photo: null } as Partial<Values>,
+    defaultValues: { phone: "+234", id_document: null, profile_photo: null } as unknown as Partial<Values>,
   });
 
   const onSubmit = handleSubmit(async (values) => {

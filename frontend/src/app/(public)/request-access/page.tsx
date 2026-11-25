@@ -57,7 +57,7 @@ export default function RequestAccessPage() {
 
   const { register, control, handleSubmit, setValue, setError: setFieldError, formState: { errors, isSubmitting } } = useForm<Values>({
     resolver: zodResolver(schema),
-    defaultValues: { phone: "+234", profile_photo: null, face_capture: null } as Partial<Values>,
+    defaultValues: { phone: "+234", profile_photo: null, face_capture: null } as unknown as Partial<Values>,
   });
 
   const lookupActive = debouncedUnit.length >= 2 && selectedUnit?.code !== debouncedUnit;

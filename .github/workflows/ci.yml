@@ -21,6 +21,8 @@ jobs:
           coverage: none
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Prepare environment
+        run: cp .env.example .env && php artisan key:generate
       - name: Code style (report only until the first pint pass is committed)
         run: vendor/bin/pint --test
         continue-on-error: true
