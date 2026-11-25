@@ -15,9 +15,13 @@ test("public site: landing, listings, request access", async ({ page }) => {
 });
 
 const portals: Array<[string, string, string[]]> = [
-  ["super.admin", "/admin", ["/admin", "/admin/users", "/admin/listings", "/admin/audit-logs"]],
+  ["super.admin", "/admin", ["/admin", "/admin/users", "/admin/listings", "/admin/audit-logs", "/admin/settings"]],
+  ["estate.manager", "/admin", ["/admin/residents", "/admin/staff", "/admin/stores", "/admin/reports", "/notices", "/community"]],
+  ["finance.officer", "/admin", ["/admin/finance", "/admin/finance/bills", "/admin/finance/payments", "/admin/finance/outstanding", "/admin/finance/services"]],
+  ["security.officer", "/security", ["/security", "/security/alerts", "/security/gate", "/security/logs", "/security/blacklist", "/security/incidents"]],
+  ["resident.head", "/resident", ["/resident", "/resident/household", "/resident/finance", "/resident/visitors", "/resident/emergency", "/resident/market", "/resident/orders", "/messages", "/account/security"]],
+  ["store.owner", "/store", ["/store", "/store/products", "/store/orders"]],
   ["agent", "/agent", ["/agent", "/agent/listings"]],
-  ["resident.head", "/resident", ["/resident"]],
 ];
 
 for (const [role, home, pages] of portals) {
