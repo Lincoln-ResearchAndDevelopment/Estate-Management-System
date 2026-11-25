@@ -1,52 +1,53 @@
 # Development progress
 
-Last updated: 25 Nov 2026 · Branch `rebuild/pahe-v2`
+Last updated: 25 Nov 2026 · Branch `rebuild/pahe-v2` · PR #1 → `develop`
 
-**Nothing is marked Complete yet.** The code below was written without access to Composer or npm, so it has not been
-installed, built, run or tested. "In Progress" for Testing means the tests are written but have not been run.
-A module moves to Complete only after its tests pass and the flow is checked in a browser at 1280 and 390 px.
+## How things are verified
 
-| Module | Figma analysis | Frontend | Backend | Database | API integration | Permissions | Testing | Final review |
-|---|---|---|---|---|---|---|---|---|
-| Foundation (auth, RBAC, shell, audit, errors) | In Progress | In Progress | In Progress | In Progress | In Progress | In Progress | In Progress | Pending |
-| M16 Listings & landing page | Pending (no Figma frames; built from SRS §7.17) | In Progress | In Progress | In Progress | In Progress | In Progress | In Progress | Pending |
-| M12 Users & approvals | In Progress | In Progress | In Progress | In Progress | In Progress | In Progress | In Progress | Pending |
-| M04 Property & units | In Progress | In Progress (directory only) | In Progress | In Progress | In Progress | In Progress | Pending | Pending |
-| M01 Auth & onboarding | In Progress | In Progress | In Progress | In Progress | In Progress | In Progress | In Progress | Pending |
-| M13 Notifications | In Progress | In Progress (bell + page) | In Progress (in-app + e-mail) | In Progress | In Progress | In Progress | Pending | Pending |
-| M02 Dashboards | In Progress | In Progress (admin, agent) | In Progress | — | In Progress | In Progress | Pending | Pending |
-| M15 Administration | Pending | In Progress (audit log viewer) | In Progress (audit log) | In Progress | In Progress | In Progress | Pending | Pending |
-| M03 Residents & households | Pending | Pending | Pending (tables only) | In Progress | Pending | Pending | Pending | Pending |
-| M05 Finance & billing | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending |
-| M09 Access control | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending |
-| M10 Blacklist | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending |
-| M08 Security & emergency | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending |
-| M07 Communication | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending |
-| M11 Staff | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending |
-| M06 Marketplace | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending |
-| M14 Reports | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending |
+Every push runs three CI jobs (`.github/workflows/ci.yml`):
 
-## Tests written
+1. **Backend** — `composer install`, Pint (report only), PHPUnit feature + unit tests.
+2. **Frontend** — ESLint, TypeScript type check, Vitest, `next build`.
+3. **End-to-end** — builds the Docker images, starts the full stack (MySQL, API, worker, scheduler, web, Mailpit) with
+   seeded test data, and drives it with Playwright: every portal is signed into and its main pages opened, plus two
+   real flows (resident pays a bill through the test checkout; resident creates a visitor pass and the gate checks the
+   visitor in). Screenshots are published to the `ci/e2e-screenshots` branch for review.
 
-Backend (`php artisan test`): `AuthTest` (8), `AuthorizationMatrixTest` (7 roles × 3 endpoints + 3), `ListingWorkflowTest` (11, covering AT-25–AT-30, AT-32 and expiry),
-`AccessRequestTest` (5, AT-01), `UserManagementTest` (4), `ListingStatusTest` (unit, 2).
+At commit `f668d4c` all three jobs pass: 55 backend tests (326 assertions), frontend lint/types/tests/build,
+11 E2E tests. Screens were reviewed from the CI screenshots at 1366 px desktop width.
 
-Frontend (`npm test`): formatting and API helpers, StatusPill, Pagination, Button.
+**"Complete" below means:** built, wired to the real API, covered by backend tests, opened in the E2E run with real
+data, and screenshots reviewed. It does **not** yet mean client acceptance (UAT) or a check at mobile width.
 
-Not yet written: Playwright end-to-end tests at 1280/390 px, accessibility (axe) checks.
+| Module | Frontend | Backend | Database | API integration | Permissions | Testing | Final review |
+|---|---|---|---|---|---|---|---|
+| Foundation (auth, RBAC, shell, audit, errors) | Complete | Complete | Complete | Complete | Complete | Complete | Pending UAT |
+| M01 Auth & onboarding (incl. MFA/TOTP) | Complete | Complete | Complete | Complete | Complete | Complete | Pending UAT |
+| M02 Dashboards (admin, agent, resident, security, store, finance) | Complete | Complete | — | Complete | Complete | Complete | Pending UAT |
+| M03 Residents & households (profile, members, vehicles) | Complete | Complete | Complete | Complete | Complete | In Progress (no dedicated household test) | Pending UAT |
+| M04 Property & units | Complete | Complete | Complete | Complete | Complete | In Progress | Pending UAT |
+| M05 Finance & billing (services, auto-billing, Paystack + test checkout, transfers, receipts) | Complete | Complete | Complete | Complete | Complete | Complete | Pending UAT; live Paystack not exercised |
+| M06 Marketplace (stores, products, orders, approvals) | Complete | Complete | Complete | Complete | Complete | Complete | Pending UAT |
+| M07 Communication (notices, meetings, feed, messages) | Complete | Complete | Complete | Complete | Complete | Complete | Pending UAT |
+| M08 Security & emergency (panic, alert lifecycle, escalation, incidents) | Complete | Complete | Complete | Complete | Complete | Complete | Pending UAT |
+| M09 Access control (passes, gate, logs, away notices) | Complete | Complete | Complete | Complete | Complete | Complete | Pending UAT |
+| M10 Blacklist & watchlist | Complete | Complete | Complete | Complete | Complete | Complete | Pending UAT |
+| M11 Staff | Complete | Complete | Complete | Complete | Complete | Complete | Pending UAT |
+| M12 Users & approvals | Complete | Complete | Complete | Complete | Complete | Complete | Pending UAT |
+| M13 Notifications (in-app + e-mail) | Complete | Complete | Complete | Complete | Complete | In Progress | Pending UAT |
+| M14 Reports & CSV exports | Complete | Complete | — | Complete | Complete | Complete | Pending UAT |
+| M15 Administration (audit log, settings) | Complete | Complete | Complete | Complete | Complete | Complete | Pending UAT |
+| M16 Listings & landing page | Complete | Complete | Complete | Complete | Complete | Complete | Pending UAT |
+| Deployment (Docker, Codespaces, VPS + HTTPS) | — | — | — | — | — | Complete (CI boots the stack) | Pending first real server deploy |
 
-## Next steps
+## Known gaps (not built or not verified)
 
-1. Install dependencies, run both test suites and `next build`; fix what fails.
-2. Check every screen in a browser against SRS §7.17 at desktop and mobile widths.
-3. MFA (TOTP) for Super Admin, Estate Manager and Finance Officer (FR-AUTH-12) — not implemented.
-4. Phase 3 of the roadmap: resident profile, household, vehicles (M03) and resident dashboard.
-
-## Known gaps in this release
-
-- **MFA is not implemented** (FR-AUTH-12). Sign-in lockout and rate limits are.
-- **SMS and Web Push channels are not implemented**; notifications are in-app and e-mail.
-- **CAPTCHA**: the Turnstile widget and server check are wired, but inactive until keys are set.
-- **Estate office contact details** in the site footer are placeholders until the client supplies them.
-- **Logo**: text monogram until an authorised logo is supplied.
-- On edit, clearing an optional listing field (e.g. size) or all amenities does not clear the stored value.
+- **Mobile width not checked.** Layouts are responsive (tables become cards below 768 px) but no 390 px screenshots
+  have been reviewed yet.
+- **SMS and Web Push** notifications are not implemented; notifications are in-app and e-mail.
+- **Real-time** features (alerts, messages, gate) use polling every 5–30 s, not WebSockets.
+- **Live Paystack** has not been tested; the test checkout and HMAC webhook verification are tested.
+- **Store logos and product images**: the API accepts uploads; the store portal screens do not yet offer the upload.
+- **Accessibility audit (axe)** not yet run.
+- **Logo**: text monogram until an authorised logo is supplied. No official insignia is used.
+- Pint style fixes are reported but not yet applied (`vendor/bin/pint` once locally).

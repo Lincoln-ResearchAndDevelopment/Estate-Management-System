@@ -64,3 +64,19 @@ property_listings 1─* listing_media | listing_status_history | listing_enquiri
 
 Audit logs 7 years (financial) / 2 years otherwise; listing enquiries 12 months; deleted listings restorable for 30 days.
 Retention jobs are not implemented yet.
+
+## Operational tables (migrations `2026_11_26_00000{1,2,3}`)
+
+| Area | Tables | Notes |
+|---|---|---|
+| Users (MFA) | `users.mfa_secret`, `mfa_enabled_at`, `mfa_recovery_codes` | secret and recovery codes encrypted at rest |
+| Households | `vehicles` | plate numbers unique, normalised to upper case without spaces |
+| Finance | `services`, `service_assignments`, `bills`, `payments`, `payment_allocations` | one bill per household/service/period (`bills_one_per_period`); a payment is split across bills in `payment_allocations`; receipts numbered `PAHE-RCT-<year>-NNNNN` |
+| Security | `emergency_alerts`, `alert_events`, `incident_reports`, `incident_notes` | every alert status change is an `alert_events` row |
+| Access | `visitor_passes`, `access_logs`, `away_notices`, `blacklist_entries` | refused entries are logged with `flag_reason` starting `REFUSED:` |
+| Staff | `staff_profiles` | optional link to a `users` login |
+| Communication | `announcements`, `meetings`, `meeting_rsvps`, `community_posts`, `post_comments`, `conversations`, `conversation_participants`, `messages` | unread state from `conversation_participants.last_read_at` |
+| Marketplace | `stores`, `products`, `orders`, `order_items` | order lines copy name and price at the time of order; stock is reserved on acceptance |
+| Settings | `system_settings` | estate contact details and the bank account shown for transfers |
+
+Money columns are `DECIMAL(14,2)` in naira. All timestamps are stored in UTC and shown in Africa/Lagos time.

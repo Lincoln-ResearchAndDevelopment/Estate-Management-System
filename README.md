@@ -4,10 +4,18 @@ Estate management platform for Post Army Housing Estates, Abuja: a public landin
 listings, and role-based portals for estate management, property agents and residents. One mobile-friendly
 website; no native apps.
 
-> **Status: Phase 1 foundation and first modules written; not yet installed, built or run.**
-> This code was written in an environment without access to Composer or npm registries, so `composer install`,
-> `npm install`, the test suites and `next build` have **not been run**. Expect a first round of fixes when you
-> install dependencies. See [documentation/progress.md](documentation/progress.md) for exactly what is done.
+> **Status:** all SRS modules are built and wired end to end. CI runs the backend and frontend test suites and boots
+> the full Docker stack for Playwright end-to-end tests on every push. See [documentation/progress.md](documentation/progress.md)
+> for exactly what is verified and the known gaps.
+
+## Test it live
+
+**Fastest:** on GitHub choose **Code → Codespaces → Create codespace** on this branch. The stack builds and opens
+by itself (about 6–10 minutes the first time). Sign in with `resident.head@test.pahe.local`,
+`super.admin@test.pahe.local`, `security.officer@test.pahe.local` … password `Demo@Pahe2026`.
+Full account list and production deployment: [documentation/deployment-guide.md](documentation/deployment-guide.md).
+
+**With Docker anywhere:** `./scripts/setup-env.sh && docker compose up -d --build`, then open http://localhost:3000.
 
 | Folder | Stack |
 |---|---|
@@ -16,42 +24,24 @@ website; no native apps.
 | [`documentation/`](documentation) | Architecture, API, database, installation, deployment, progress tracker |
 | [`legacy/`](legacy) | The previous merged implementation, kept for reference only. Not built or deployed. |
 
-## Quick start (local)
+## Local development without Docker
 
-```bash
-# API
-cd backend
-composer install
-cp .env.example .env && php artisan key:generate
-# create the MySQL database named in .env, then:
-php artisan migrate --seed          # seeds roles + clearly marked TEST data (not in production)
-php artisan storage:link
-php artisan serve                   # http://localhost:8000
-php artisan queue:work              # e-mails and notifications (separate terminal)
+See [documentation/installation-guide.md](documentation/installation-guide.md) (PHP 8.2+, Composer, MySQL 8, Node 22).
 
-# Web
-cd ../frontend
-npm install
-cp .env.example .env.local
-npm run dev                         # http://localhost:3000
-```
+## What is in this release
 
-Test accounts (local only): `super.admin@test.pahe.local`, `estate.manager@test.pahe.local`, `agent@test.pahe.local`,
-`resident.head@test.pahe.local` … password from `DEMO_USER_PASSWORD` (default `Demo@Pahe2026`).
-
-Full instructions: [documentation/installation-guide.md](documentation/installation-guide.md).
-
-## What works in this release
-
-- **Authentication:** sign-in with lockout after 5 failed attempts, forgot/reset password, invitation links (no shared default passwords), change password, sign-out.
-- **RBAC:** 9 roles and permissions seeded from SRS §5.3, enforced on every API route; navigation built from the user's permissions.
-- **Public landing page (M16):** approved listings only, search/filters/sort in the URL, listing detail with gallery, enquiry form (CAPTCHA-ready), phone reveal (logged), SEO metadata, JSON-LD and sitemap.
-- **Agent portal (M16):** dashboard, create/edit/delete listings, photo upload from phone camera, submit for approval, renew, mark rented/sold, enquiries, profile.
-- **Listing approvals (M16):** queue, review page with change diff and checklist, approve / reject / withdraw / delete (with reasons), SA restore within 30 days, feature; agent applications and suspension (withdraws live listings).
-- **Residents (M12/M04):** public registration with NIN (encrypted) and photos, approval queue, user management, estate directory (sectors, streets, units).
-- **Platform:** append-only audit log and viewer, in-app + e-mail notifications, problem+json errors, security headers, rate limits.
-
-Everything else in the SRS (finance, security, access control, communication, marketplace, staff, reports) is **not built yet**.
+- **Public site:** landing page and approved property listings with search, enquiries and receipt verification.
+- **Residents:** dashboard, household members and vehicles, bills and online/transfer payments with receipts,
+  visitor passes with gate codes, away notices, panic button, marketplace orders, notices, meetings, feed, messages.
+- **Estate administration:** access requests, households, users, estate directory, listing and agent approvals,
+  store approvals, staff, reports with CSV exports, settings, audit log.
+- **Finance:** service charges with automatic monthly/quarterly/yearly billing, manual bills, Paystack (or test
+  checkout), bank-transfer verification, offline payments, outstanding balances, charts.
+- **Security:** live HQ dashboard, alert response workflow with escalation, gate control with blacklist/watchlist
+  screening, access logs, incident reports.
+- **Agents and store owners:** their own portals for listings/enquiries and store/products/orders.
+- **Platform:** 9 roles with permissions enforced on every API route, TOTP two-factor sign-in (mandatory for admins
+  and finance in production), in-app + e-mail notifications, rate limits, security headers, audit log.
 
 ## Branching
 

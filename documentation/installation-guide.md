@@ -1,5 +1,7 @@
 # Installation guide (local development)
 
+> **Quickest way to run everything:** Docker — see [deployment-guide.md](deployment-guide.md). This guide covers running the API and web app directly for development.
+
 ## Requirements
 
 - PHP 8.2+ with `pdo_mysql`, `mbstring`, `intl`, `gd`, `fileinfo`; Composer 2
