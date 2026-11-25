@@ -57,6 +57,8 @@ jobs:
     name: End-to-end (Docker stack + Playwright)
     runs-on: ubuntu-latest
     needs: [backend, frontend]
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - name: Generate test environment
@@ -87,3 +89,14 @@ jobs:
             e2e/screenshots
             e2e/playwright-report
           retention-days: 14
+      - name: Publish screenshots to the ci/e2e-screenshots branch (review without downloading artifacts)
+        if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          [ -d e2e/screenshots ] || exit 0
+          cd e2e/screenshots
+          git init -q -b ci/e2e-screenshots
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          echo "Screenshots from CI run ${{ github.run_id }} for ${{ github.event.pull_request.head.sha }}" > README.md
+          git add -A && git commit -qm "E2E screenshots for ${{ github.event.pull_request.head.sha }}"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ci/e2e-screenshots

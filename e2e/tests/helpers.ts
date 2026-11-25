@@ -6,7 +6,10 @@ const SHOTS = "screenshots";
 
 export async function shot(page: Page, name: string) {
   fs.mkdirSync(SHOTS, { recursive: true });
-  await page.waitForLoadState("networkidle").catch(() => undefined);
+  // Portal pages poll for live data, so "network idle" never arrives; wait for loading skeletons instead.
+  await page.waitForLoadState("domcontentloaded");
+  await page.locator("[aria-busy='true'], .animate-pulse").first().waitFor({ state: "detached", timeout: 15_000 }).catch(() => undefined);
+  await page.waitForTimeout(500);
   await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true });
 }
 
