@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, X as XIcon } from "lucide-react";
 import { api, ApiError, type Paginated } from "@/lib/api";
@@ -24,7 +24,7 @@ export default function AccessRequestsPage() {
   const toast = useToast();
   const queryClient = useQueryClient();
   const { params, update } = useListParams(["status", "q", "selected"] as const);
-  const [selected, setSelected] = useState<AccessRequest | null>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(() => (params.selected ? Number(params.selected) : null));
   const [dialog, setDialog] = useState<null | "approve" | "reject" | "info">(null);
   const [busy, setBusy] = useState(false);
   const status = params.status || "pending";
@@ -35,9 +35,8 @@ export default function AccessRequestsPage() {
     placeholderData: keepPreviousData,
   });
 
-  useEffect(() => {
-    if (params.selected && data) setSelected(data.data.find((r) => r.id === Number(params.selected)) ?? null);
-  }, [params.selected, data]);
+  const selected = data?.data.find((r) => r.id === selectedId) ?? null;
+  const setSelected = (r: AccessRequest | null) => setSelectedId(r?.id ?? null);
 
   const decide = async (path: string, body: object | undefined, success: string) => {
     if (!selected) return;

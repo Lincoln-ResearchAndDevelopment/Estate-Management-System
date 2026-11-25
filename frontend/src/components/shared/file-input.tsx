@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { FileText, Upload, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -21,16 +21,11 @@ interface FileInputProps {
 export function FileInput({ label, accept, maxMb, value, onChange, error, hint, required, capture }: FileInputProps) {
   const id = useId();
   const [localError, setLocalError] = useState<string | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+  const preview = useMemo(() => (value && value.type.startsWith("image/") ? URL.createObjectURL(value) : null), [value]);
 
-  useEffect(() => {
-    if (value && value.type.startsWith("image/")) {
-      const url = URL.createObjectURL(value);
-      setPreview(url);
-      return () => URL.revokeObjectURL(url);
-    }
-    setPreview(null);
-  }, [value]);
+  useEffect(() => () => {
+    if (preview) URL.revokeObjectURL(preview);
+  }, [preview]);
 
   const pick = (file: File | undefined) => {
     setLocalError(null);

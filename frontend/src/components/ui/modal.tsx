@@ -110,64 +110,56 @@ interface ReasonDialogProps {
 }
 
 /** Reject / withdraw / delete with a required reason (10–500 characters) and optional preset reasons. */
-export function ReasonDialog({ open, onClose, onSubmit, title, description, confirmLabel, presets = [], destructive, loading, error }: ReasonDialogProps) {
+export function ReasonDialog({ open, onClose, title, description, ...formProps }: ReasonDialogProps) {
+  // The form mounts only while the dialog is open, so every opening starts empty.
+  return (
+    <Modal open={open} onClose={onClose} title={title} description={description}>
+      <ReasonForm onClose={onClose} {...formProps} />
+    </Modal>
+  );
+}
+
+function ReasonForm({ onClose, onSubmit, confirmLabel, presets = [], destructive, loading, error }: Omit<ReasonDialogProps, "open" | "title" | "description">) {
   const [preset, setPreset] = useState("");
   const [text, setText] = useState("");
   const [touched, setTouched] = useState(false);
   const reason = [preset && preset !== "Other" ? preset : "", text].filter(Boolean).join(": ").trim();
   const invalid = reason.length < 10 || reason.length > 500;
 
-  useEffect(() => {
-    if (open) {
-      setPreset("");
-      setText("");
-      setTouched(false);
-    }
-  }, [open]);
-
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={title}
-      description={description}
-      footer={
-        <>
-          <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-          <Button
-            variant={destructive ? "danger" : "primary"}
-            loading={loading}
-            onClick={() => {
-              setTouched(true);
-              if (!invalid) onSubmit(reason);
-            }}
-          >
-            {confirmLabel}
-          </Button>
-        </>
-      }
-    >
-      <div className="space-y-4">
-        {presets.length > 0 && (
-          <Field label="Reason" htmlFor="reason-preset">
-            <Select id="reason-preset" value={preset} onChange={(e) => setPreset(e.target.value)}>
-              <option value="">Choose a reason…</option>
-              {presets.map((p) => (
-                <option key={p} value={p}>{p}</option>
-              ))}
-            </Select>
-          </Field>
-        )}
-        <Field
-          label={presets.length ? "Details" : "Reason"}
-          htmlFor="reason-text"
-          required
-          error={(touched && invalid ? "Give a reason of 10 to 500 characters." : undefined) ?? error}
-          hint="The reason is shown to the person affected."
-        >
-          <Textarea id="reason-text" value={text} onChange={(e) => setText(e.target.value)} maxLength={500} aria-invalid={touched && invalid} />
+    <div className="space-y-4">
+      {presets.length > 0 && (
+        <Field label="Reason" htmlFor="reason-preset">
+          <Select id="reason-preset" value={preset} onChange={(e) => setPreset(e.target.value)}>
+            <option value="">Choose a reason…</option>
+            {presets.map((p) => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </Select>
         </Field>
+      )}
+      <Field
+        label={presets.length ? "Details" : "Reason"}
+        htmlFor="reason-text"
+        required
+        error={(touched && invalid ? "Give a reason of 10 to 500 characters." : undefined) ?? error}
+        hint="The reason is shown to the person affected."
+      >
+        <Textarea id="reason-text" value={text} onChange={(e) => setText(e.target.value)} maxLength={500} aria-invalid={touched && invalid} />
+      </Field>
+      <div className="-mx-5 -mb-4 flex flex-wrap justify-end gap-2 border-t border-line px-5 py-3">
+        <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
+        <Button
+          variant={destructive ? "danger" : "primary"}
+          loading={loading}
+          onClick={() => {
+            setTouched(true);
+            if (!invalid) onSubmit(reason);
+          }}
+        >
+          {confirmLabel}
+        </Button>
       </div>
-    </Modal>
+    </div>
   );
 }

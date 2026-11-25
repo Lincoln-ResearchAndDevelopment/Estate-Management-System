@@ -8,9 +8,14 @@ import { cn } from "@/lib/utils";
 /** Debounced search box that reports the settled value (FR-GEN-02). */
 export function SearchInput({ value, onChange, placeholder, className }: { value: string; onChange: (value: string) => void; placeholder: string; className?: string }) {
   const [text, setText] = useState(value);
+  const [lastValue, setLastValue] = useState(value);
   const debounced = useDebouncedValue(text);
 
-  useEffect(() => setText(value), [value]);
+  // Follow external changes (e.g. "Clear filters") without an effect.
+  if (value !== lastValue) {
+    setLastValue(value);
+    setText(value);
+  }
   useEffect(() => {
     if (debounced !== value) onChange(debounced);
     // eslint-disable-next-line react-hooks/exhaustive-deps

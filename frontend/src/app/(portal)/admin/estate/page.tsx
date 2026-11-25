@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Building2, DoorOpen, Home, Plus } from "lucide-react";
@@ -51,7 +51,7 @@ export default function EstatePage() {
   });
 
   const unitForm = useForm<UnitValues>({ resolver: zodResolver(unitSchema) });
-  const unitSector = unitForm.watch("sector_id");
+  const unitSector = useWatch({ control: unitForm.control, name: "sector_id" });
   const streets = useQuery({ queryKey: ["streets", Number(unitSector)], queryFn: () => api.get<{ data: Street[] }>("/streets", { sector_id: unitSector }), enabled: !!unitSector });
   const simpleForm = useForm<SimpleValues>({ resolver: zodResolver(simpleSchema) });
 

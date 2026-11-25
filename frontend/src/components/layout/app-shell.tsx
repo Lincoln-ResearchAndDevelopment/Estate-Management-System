@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Bell, ChevronsLeft, ChevronsRight, LogOut, Menu, X } from "lucide-react";
 import { api } from "@/lib/api";
@@ -14,6 +14,29 @@ import type { AppNotification, Paginated } from "@/types/api";
 import { NAVIGATION, PORTAL_SUBTITLE, type NavItem, type Portal } from "./nav";
 
 const COLLAPSE_KEY = "pahe.sidebar.collapsed";
+const collapseListeners = new Set<() => void>();
+
+function readCollapse(): boolean {
+  try {
+    return localStorage.getItem(COLLAPSE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeCollapse(value: boolean) {
+  try {
+    localStorage.setItem(COLLAPSE_KEY, value ? "1" : "0");
+  } catch {
+    /* storage unavailable: the preference lasts for this page only */
+  }
+  collapseListeners.forEach((l) => l());
+}
+
+function subscribeCollapse(listener: () => void) {
+  collapseListeners.add(listener);
+  return () => collapseListeners.delete(listener);
+}
 
 function useBadges(portal: Portal, can: (p: string | string[]) => boolean) {
   const admin = useQuery({
@@ -161,29 +184,13 @@ export function AppShell({ portal, children }: { portal: Portal; children: React
   const { session, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const collapsed = useSyncExternalStore(subscribeCollapse, readCollapse, () => false);
+  // The drawer is open only for the page it was opened on, so navigating closes it.
+  const [drawerPath, setDrawerPath] = useState<string | null>(null);
+  const mobileOpen = drawerPath === pathname;
+  const setMobileOpen = (open: boolean) => setDrawerPath(open ? pathname : null);
 
-  useEffect(() => {
-    try {
-      setCollapsed(localStorage.getItem(COLLAPSE_KEY) === "1");
-    } catch {
-      /* storage unavailable */
-    }
-  }, []);
-
-  useEffect(() => setMobileOpen(false), [pathname]);
-
-  const toggleCollapsed = () => {
-    setCollapsed((c) => {
-      try {
-        localStorage.setItem(COLLAPSE_KEY, c ? "0" : "1");
-      } catch {
-        /* storage unavailable */
-      }
-      return !c;
-    });
-  };
+  const toggleCollapsed = () => writeCollapse(!collapsed);
 
   const initials = useMemo(
     () => (session?.user.name ?? "?").split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase(),

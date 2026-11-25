@@ -60,17 +60,18 @@ export default function RequestAccessPage() {
     defaultValues: { phone: "+234", profile_photo: null, face_capture: null } as Partial<Values>,
   });
 
+  const lookupActive = debouncedUnit.length >= 2 && selectedUnit?.code !== debouncedUnit;
+
   useEffect(() => {
-    if (debouncedUnit.length < 2 || selectedUnit?.code === debouncedUnit) {
-      setUnitOptions([]);
-      return;
-    }
+    if (!lookupActive) return;
     const controller = new AbortController();
     api.get<{ data: UnitOption[] }>("/public/units/lookup", { q: debouncedUnit }, controller.signal)
       .then((r) => setUnitOptions(r.data))
       .catch(() => setUnitOptions([]));
     return () => controller.abort();
-  }, [debouncedUnit, selectedUnit]);
+  }, [debouncedUnit, lookupActive]);
+
+  const visibleOptions = lookupActive ? unitOptions : [];
 
   const chooseUnit = (u: UnitOption) => {
     setSelectedUnit(u);
@@ -131,7 +132,7 @@ export default function RequestAccessPage() {
               <Input
                 id="unit"
                 role="combobox"
-                aria-expanded={unitOptions.length > 0}
+                aria-expanded={visibleOptions.length > 0}
                 aria-controls="unit-options"
                 aria-autocomplete="list"
                 autoComplete="off"
@@ -143,9 +144,9 @@ export default function RequestAccessPage() {
                   setValue("unit_id", undefined as unknown as number);
                 }}
               />
-              {unitOptions.length > 0 && (
+              {visibleOptions.length > 0 && (
                 <ul id="unit-options" role="listbox" className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-line bg-white shadow-lg">
-                  {unitOptions.map((u) => (
+                  {visibleOptions.map((u) => (
                     <li key={u.id} role="option" aria-selected={false}>
                       <button type="button" onClick={() => chooseUnit(u)} className="block w-full px-3 py-2 text-left text-sm hover:bg-army-50">
                         <span className="font-medium">{u.code}</span>
