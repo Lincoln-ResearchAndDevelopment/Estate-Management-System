@@ -29,6 +29,8 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
         Route::post('listings/{id}/contact-reveal', [Public\ListingController::class, 'revealContact'])->whereNumber('id')->middleware('throttle:public-forms');
         Route::get('sitemap-listings.xml', [Public\ListingController::class, 'sitemap']);
         Route::get('units/lookup', [EstateController::class, 'lookup'])->middleware('throttle:30,1');
+        // Street names for listing forms and public filters (not sensitive).
+        Route::get('streets', [EstateController::class, 'streets']);
     });
 
     // ---------------------------------------------------------------- auth

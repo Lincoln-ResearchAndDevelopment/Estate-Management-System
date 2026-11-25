@@ -10,7 +10,6 @@ use App\Models\PropertyListing;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Validation\Rule;
 
 /** Agent dashboard (SCR-LIST-04), enquiries (SCR-LIST-07) and profile. */

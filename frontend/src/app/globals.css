@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+/*
+ * PAHE design tokens — Nigerian Army-inspired palette (master prompt, Section 3).
+ * Deep green is the brand colour; gold is used sparingly for selected/important indicators;
+ * red, amber and green are reserved for semantic states.
+ */
+@theme {
+  --color-army-950: #0f261c;
+  --color-army-900: #18392b; /* Army Deep Green — sidebar, headers, primary */
+  --color-army-800: #254d38; /* Forest Green — active nav, highlights */
+  --color-army-700: #2f5e45;
+  --color-army-100: #e3ece6;
+  --color-army-50: #f2f6f3;
+
+  --color-olive-700: #445624;
+  --color-olive-600: #556b2f; /* Military Olive — secondary actions */
+  --color-olive-100: #e8edd9;
+
+  --color-khaki-400: #c3b091; /* Khaki — supporting elements */
+  --color-sand-100: #e7dcc7; /* Sand Beige — light accents */
+  --color-sand-50: #f6f1e7;
+
+  --color-gold-500: #c6a04a; /* Gold — important indicators only */
+  --color-gold-100: #f5ecd6;
+
+  --color-ink-900: #252b28; /* Charcoal — primary text */
+  --color-ink-600: #545c58;
+  --color-ink-400: #8a918d;
+  --color-line: #dfe3dd;
+  --color-canvas: #f7f8f5;
+
+  --color-success-600: #1f7a4d;
+  --color-success-50: #e7f5ee;
+  --color-warning-600: #b26b00;
+  --color-warning-50: #fdf3e1;
+  --color-danger-600: #b42318;
+  --color-danger-50: #fdecea;
+  --color-info-600: #2b5f8a;
+  --color-info-50: #e8f1f8;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-barlow), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  --radius-card: 0.75rem;
+  --shadow-card: 0 1px 2px rgb(16 24 20 / 0.06), 0 1px 3px rgb(16 24 20 / 0.08);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-canvas text-ink-900 font-sans antialiased;
+  }
+  h1, h2, h3 {
+    @apply font-display tracking-tight;
+  }
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-gold-500;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-[var(--radius-card)] border border-line bg-white shadow-[var(--shadow-card)];
+  }
+}

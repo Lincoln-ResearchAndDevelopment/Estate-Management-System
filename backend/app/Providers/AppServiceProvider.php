@@ -48,10 +48,15 @@ class AppServiceProvider extends ServiceProvider
         }
 
         // OpenAPI 3.1 document at /docs/api.json, UI at /docs/api (local and staging only by default).
-        Scramble::configure()
-            ->routes(fn ($route) => str_starts_with($route->uri, 'api/v1'))
-            ->withDocumentTransformers(function (OpenApi $openApi) {
-                $openApi->secure(SecurityScheme::apiKey('cookie', 'laravel_session'));
-            });
+        // Guarded so an API-docs configuration change can never take the API itself down.
+        try {
+            Scramble::configure()
+                ->routes(fn ($route) => str_starts_with($route->uri, 'api/v1'))
+                ->withDocumentTransformers(function (OpenApi $openApi) {
+                    $openApi->secure(SecurityScheme::apiKey('cookie', 'laravel_session'));
+                });
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 }
