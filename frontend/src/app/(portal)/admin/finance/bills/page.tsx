@@ -81,7 +81,7 @@ function IssueModal({ onClose, onDone }: { onClose: () => void; onDone: () => vo
   const [households, setHouseholds] = useState<HouseholdOption[]>([]);
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
-  const [due, setDue] = useState(new Date(Date.now() + 14 * 86400_000).toISOString().slice(0, 10));
+  const [due, setDue] = useState(() => new Date(Date.now() + 14 * 86400_000).toISOString().slice(0, 10));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
 
