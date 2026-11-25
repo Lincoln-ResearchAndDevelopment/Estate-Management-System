@@ -2,119 +2,47 @@
 
 namespace App\Http\Controllers\Api\V1\Admin;
 
+use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
+use App\Models\AccessRequest;
+use App\Models\AgentProfile;
+use App\Models\AuditLog;
+use App\Models\PropertyListing;
+use App\Models\Resident;
+use App\Models\Unit;
 use Illuminate\Http\JsonResponse;
-use App\Models\Reminder;
-use App\Models\EstateUpdate;
 
+/**
+ * GET /admin/dashboard — KPIs computed live from the database (FR-DASH-01, FR-DASH-07).
+ * Finance KPIs (monthly revenue) are added when M05 Finance is built.
+ */
 class DashboardController extends Controller
 {
-    /**
-     * Aggregated Dashboard Payload
-     */
-    public function index(): JsonResponse
+    public function __invoke(): JsonResponse
     {
-        $metrics = $this->getMetricsData();
-        $reminders = Reminder::latest()->take(5)->get();
-        $latestUpdate = EstateUpdate::latest('published_at')->first();
+        $totalUnits = Unit::count();
+        $occupied = Unit::where('occupancy_status', 'occupied')->count();
+        $residentsThisMonth = Resident::where('status', 'active')->where('created_at', '>=', now()->startOfMonth())->count();
 
-        return response()->json([
-            'status' => 'success',
-            'data' => [
-                'administrator' => [
-                    'name' => 'Administrator',
-                    'role' => 'Estate Manager',
-                    'avatar_url' => 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80',
-                ],
-                'system_status' => [
-                    'date' => now()->format('M d, Y'),
-                    'time' => now()->format('H:i A') . ' WAT',
-                    'operational' => true,
-                ],
-                'metrics' => $metrics,
-                'reminders' => $reminders,
-                'latest_update' => $latestUpdate,
+        return response()->json(['data' => [
+            'kpis' => [
+                'totalResidents' => ['value' => Resident::where('status', 'active')->count(), 'delta' => $residentsThisMonth, 'deltaLabel' => 'this month', 'link' => '/admin/users?role=resident_head'],
+                'occupiedUnits' => ['value' => $occupied, 'percent' => $totalUnits ? round($occupied / $totalUnits * 100, 1) : 0, 'total' => $totalUnits, 'link' => '/admin/estate'],
+                'pendingAccessRequests' => ['value' => AccessRequest::where('status', 'pending')->count(), 'link' => '/admin/access-requests?status=pending'],
+                'pendingListings' => ['value' => PropertyListing::where('status', 'pending_approval')->count(), 'link' => '/admin/listings?status=pending_approval'],
+                'liveListings' => ['value' => PropertyListing::publiclyVisible()->count(), 'link' => '/admin/listings?status=approved'],
+                'pendingAgents' => ['value' => AgentProfile::where('status', 'pending')->count(), 'link' => '/admin/agents?status=pending'],
+                'blockedAccounts' => ['value' => \App\Models\User::where('status', UserStatus::Blocked)->count(), 'link' => '/admin/users?status=blocked'],
             ],
-        ]);
-    }
-
-    /**
-     * Return just the 4 summary metrics matching Figma KAN-22
-     */
-    public function metrics(): JsonResponse
-    {
-        return response()->json([
-            'status' => 'success',
-            'data' => $this->getMetricsData(),
-        ]);
-    }
-
-    /**
-     * Return Check-In / Check-Out Dashboard payload (Task 11)
-     */
-    public function accessLogs(): JsonResponse
-    {
-        return response()->json([
-            'status' => 'success',
-            'data' => [
-                'metrics' => [
-                    ['id' => 'total-checkins', 'label' => 'TOTAL CHECK-INS', 'value' => '245', 'icon_type' => 'checkin'],
-                    ['id' => 'total-checkouts', 'label' => 'TOTAL CHECK-OUTS', 'value' => '180', 'icon_type' => 'checkout'],
-                    ['id' => 'residents-inside', 'label' => 'RESIDENTS INSIDE', 'value' => '1,240', 'icon_type' => 'residents'],
-                    ['id' => 'visitors-inside', 'label' => 'VISITORS INSIDE', 'value' => '45', 'icon_type' => 'visitors'],
-                ],
-                'access_logs' => [
-                    ['id' => 1, 'name' => 'Sarah Jenkins', 'person_type' => 'Resident', 'house_no' => 'Villa B-12', 'check_in' => '08:45 AM', 'check_out' => '-', 'gate' => 'Main Gate', 'status' => 'in_estate'],
-                    ['id' => 2, 'name' => 'Mark Davis', 'person_type' => 'Visitor (Food Delivery)', 'initials' => 'MD', 'house_no' => 'Apt 402', 'check_in' => '09:12 AM', 'check_out' => '09:35 AM', 'gate' => 'Service Gate', 'status' => 'checked_out'],
-                    ['id' => 3, 'name' => 'Robert Chen', 'person_type' => 'Resident', 'house_no' => 'Townhouse 7', 'check_in' => '07:30 AM', 'check_out' => '10:15 AM', 'gate' => 'Main Gate', 'status' => 'checked_out'],
-                    ['id' => 4, 'name' => 'Emma Watson', 'person_type' => 'Visitor (Guest)', 'initials' => 'EW', 'house_no' => 'Villa B-12', 'check_in' => '10:45 AM', 'check_out' => '-', 'gate' => 'Main Gate', 'status' => 'in_estate'],
-                    ['id' => 5, 'name' => 'David Lee', 'person_type' => 'Resident', 'house_no' => 'Apt 105', 'check_in' => '11:20 AM', 'check_out' => '-', 'gate' => 'East Gate', 'status' => 'in_estate'],
-                ],
-                'security_summary' => [
-                    'vehicles_entered' => 185,
-                    'vehicles_trend' => '↑ 12%',
-                    'pedestrians' => 60,
-                    'pedestrians_trend' => '↓ 3%',
-                    'alert_title' => 'ALERTS',
-                    'alert_description' => '2 Unregistered vehicles attempted entry at Service Gate.',
-                ],
-            ],
-        ]);
-    }
-
-    private function getMetricsData(): array
-    {
-        return [
-            [
-                'id' => 'residents',
-                'label' => 'TOTAL RESIDENTS',
-                'value' => '1,248',
-                'trend' => '+24',
-                'trend_type' => 'positive',
-                'icon_type' => 'residents',
-            ],
-            [
-                'id' => 'houses',
-                'label' => 'OCCUPIED HOUSES',
-                'value' => '356',
-                'badge' => '94%',
-                'icon_type' => 'houses',
-            ],
-            [
-                'id' => 'revenue',
-                'label' => 'MONTHLY REVENUE',
-                'value' => '₦15.2M',
-                'trend' => '+8.4%',
-                'trend_type' => 'positive',
-                'icon_type' => 'revenue',
-            ],
-            [
-                'id' => 'requests',
-                'label' => 'PENDING REQUESTS',
-                'value' => '18',
-                'icon_type' => 'requests',
-            ],
-        ];
+            'recentActivity' => AuditLog::query()->with('actor:id,name')->latest('occurred_at')->limit(8)->get()
+                ->map(fn (AuditLog $log) => [
+                    'id' => $log->id,
+                    'action' => $log->action,
+                    'entityType' => $log->entity_type,
+                    'actor' => $log->actor?->name ?? 'System',
+                    'occurredAt' => $log->occurred_at?->toIso8601String(),
+                ]),
+            'generatedAt' => now()->toIso8601String(),
+        ]]);
     }
 }
-

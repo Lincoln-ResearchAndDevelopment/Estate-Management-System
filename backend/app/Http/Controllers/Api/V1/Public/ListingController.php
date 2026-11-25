@@ -3,63 +3,144 @@
 namespace App\Http\Controllers\Api\V1\Public;
 
 use App\Http\Controllers\Controller;
-use App\Models\Listing;
+use App\Http\Resources\ListingResource;
+use App\Models\ListingEnquiry;
+use App\Models\PropertyListing;
+use App\Models\Sector;
+use App\Notifications\NewListingEnquiry;
+use App\Services\AuditLogger;
+use App\Services\CaptchaVerifier;
+use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Validation\Rule;
 
-/** KAN-67/68: public landing page data. Only approved listings are ever returned. */
+/**
+ * Public landing page API (FR-LIST-01–04, 18). Only approved, in-window listings are ever returned;
+ * anything else is a 404.
+ */
 class ListingController extends Controller
 {
+    private const PUBLIC_RELATIONS = ['media', 'sector', 'street', 'unit', 'agent.agentProfile'];
+
     public function index(Request $request): JsonResponse
     {
-        $q = Listing::public()->where('availability', '!=', 'sold')->latest('approved_at');
+        $filters = $request->validate([
+            'type' => ['nullable', Rule::in(['rent', 'sale'])],
+            'property_type' => ['nullable', Rule::in(array_keys(config('estate.listings.property_types')))],
+            'bedrooms' => ['nullable', 'integer', 'min:0', 'max:20'],
+            'min_price' => ['nullable', 'numeric', 'min:0'],
+            'max_price' => ['nullable', 'numeric', 'min:0', 'gte:min_price'],
+            'sector_id' => ['nullable', 'integer'],
+            'q' => ['nullable', 'string', 'max:100'],
+            'sort' => ['nullable', Rule::in(['newest', 'price_asc', 'price_desc'])],
+        ]);
 
-        foreach (['listing_type', 'property_type', 'zone'] as $f) {
-            if ($v = $request->query($f)) {
-                $q->where($f, $v);
-            }
-        }
-        if ($v = $request->query('beds')) {
-            $q->where('beds', '>=', (int) $v);
-        }
-        if ($v = $request->query('min_price')) {
-            $q->where('price_kobo', '>=', (int) round($v * 100));
-        }
-        if ($v = $request->query('max_price')) {
-            $q->where('price_kobo', '<=', (int) round($v * 100));
-        }
-        if ($v = trim((string) $request->query('q', ''))) {
-            $q->where(fn ($w) => $w->where('title', 'like', "%$v%")->orWhere('address', 'like', "%$v%")->orWhere('zone', 'like', "%$v%"));
-        }
+        $listings = PropertyListing::query()
+            ->publiclyVisible()
+            ->with(self::PUBLIC_RELATIONS)
+            ->filter(collect($filters)->except('sort')->all())
+            ->sorted($filters['sort'] ?? null)
+            ->paginate(ApiResponse::pageSize($request, 12));
 
-        $page = $q->with('agent:id,name')->paginate((int) min($request->query('per_page', 12), 50));
+        return ApiResponse::paginated($listings, ListingResource::class);
+    }
 
-        return response()->json(['status' => 'success', 'data' => $page->items(), 'meta' => [
-            'page' => $page->currentPage(), 'last_page' => $page->lastPage(), 'total' => $page->total(),
+    public function featured(): JsonResponse
+    {
+        $listings = PropertyListing::query()->publiclyVisible()->where('is_featured', true)
+            ->with(self::PUBLIC_RELATIONS)->latest('approved_at')->limit(6)->get();
+
+        return response()->json(['data' => ListingResource::collection($listings)->resolve()]);
+    }
+
+    public function show(string $slug): JsonResponse
+    {
+        $listing = PropertyListing::query()->publiclyVisible()->where('slug', $slug)
+            ->with(self::PUBLIC_RELATIONS)->firstOrFail();
+
+        $listing->increment('view_count');
+
+        $similar = PropertyListing::query()->publiclyVisible()
+            ->whereKeyNot($listing->id)
+            ->where('listing_type', $listing->listing_type)
+            ->where(fn ($q) => $q->where('property_type', $listing->property_type)->orWhere('sector_id', $listing->sector_id))
+            ->with(self::PUBLIC_RELATIONS)->latest('approved_at')->limit(3)->get();
+
+        return response()->json([
+            'data' => (new ListingResource($listing))->resolve(),
+            'similar' => ListingResource::collection($similar)->resolve(),
+        ]);
+    }
+
+    /** POST /public/listings/{id}/enquiries — CAPTCHA + 5 per hour per IP (route throttle). */
+    public function enquire(Request $request, int $id, CaptchaVerifier $captcha): JsonResponse
+    {
+        $listing = PropertyListing::query()->publiclyVisible()->with('agent')->findOrFail($id);
+
+        $data = $request->validate([
+            'name' => ['required', 'string', 'min:2', 'max:100'],
+            'phone' => ['required', 'string', 'regex:/^\+234\d{10}$/'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'message' => ['required', 'string', 'min:10', 'max:1000'],
+            'preferred_viewing_date' => ['nullable', 'date', 'after_or_equal:today'],
+            'captcha_token' => ['nullable', 'string'],
+        ], ['phone.regex' => 'Enter a Nigerian mobile number in the format +234XXXXXXXXXX.']);
+
+        $captcha->verify($data['captcha_token'] ?? null, $request->ip());
+
+        $enquiry = ListingEnquiry::create([
+            'listing_id' => $listing->id,
+            'user_id' => $request->user()?->id,
+            'name' => $data['name'],
+            'phone' => $data['phone'],
+            'email' => $data['email'] ?? null,
+            'message' => $data['message'],
+            'preferred_viewing_date' => $data['preferred_viewing_date'] ?? null,
+            'status' => 'new',
+            'ip_hash' => hash('sha256', (string) $request->ip()),
+        ]);
+
+        $enquiry->setRelation('listing', $listing);
+        $listing->agent?->notify(new NewListingEnquiry($enquiry));
+
+        return ApiResponse::message('Your enquiry has been sent to the agent.', 201);
+    }
+
+    /** POST /public/listings/{id}/contact-reveal — returns the agent's phone and logs the reveal. */
+    public function revealContact(Request $request, int $id, AuditLogger $audit): JsonResponse
+    {
+        $listing = PropertyListing::query()->publiclyVisible()->with('agent')->findOrFail($id);
+        $audit->log('listing.contact_revealed', $listing);
+
+        return response()->json(['data' => ['phone' => $listing->agent?->phone, 'email' => $listing->agent?->email]]);
+    }
+
+    /** GET /public/estate — estate information and filter options for the landing page. */
+    public function estate(): JsonResponse
+    {
+        return response()->json(['data' => [
+            'name' => config('estate.name'),
+            'shortName' => config('estate.short_name'),
+            'propertyTypes' => collect(config('estate.listings.property_types'))->map(fn ($label, $value) => compact('value', 'label'))->values(),
+            'amenities' => config('estate.listings.amenities'),
+            'sectors' => Sector::query()->orderBy('name')->get(['id', 'name']),
+            'stats' => [
+                'liveListings' => PropertyListing::query()->publiclyVisible()->count(),
+                'forRent' => PropertyListing::query()->publiclyVisible()->where('listing_type', 'rent')->count(),
+                'forSale' => PropertyListing::query()->publiclyVisible()->where('listing_type', 'sale')->count(),
+            ],
         ]]);
     }
 
-    public function show(int $id): JsonResponse
+    public function sitemap(): Response
     {
-        $listing = Listing::public()->with('agent:id,name,phone,email')->findOrFail($id);
-        $listing->increment('views');
+        $base = config('estate.frontend_url');
+        $urls = PropertyListing::query()->publiclyVisible()->orderByDesc('updated_at')->limit(5000)->get(['slug', 'updated_at'])
+            ->map(fn ($l) => sprintf('<url><loc>%s/listings/%s</loc><lastmod>%s</lastmod></url>', e($base), e($l->slug), $l->updated_at->toDateString()))
+            ->implode('');
 
-        return response()->json(['status' => 'success', 'data' => $listing]);
-    }
-
-    public function inquire(Request $request, int $id): JsonResponse
-    {
-        $request->validate(['name' => 'required|string|max:100', 'phone' => 'required|string|max:30', 'message' => 'nullable|string|max:1000']);
-        $listing = Listing::public()->findOrFail($id);
-        $listing->increment('inquiries');
-        $req = \App\Models\ClientRequest::create([
-            'agent_id' => $listing->agent_id, 'listing_id' => $listing->id, 'client_name' => $request->input('name'),
-            'phone' => $request->input('phone'), 'note' => $request->input('message'), 'property_type' => $listing->property_type,
-            'min_beds' => (int) $listing->beds, 'zone' => $listing->zone, 'max_budget_kobo' => $listing->price_kobo,
-        ]);
-        \App\Models\AppNotification::create(['user_id' => $listing->agent_id, 'type' => 'inquiry', 'title' => 'New inquiry: '.$listing->title,
-            'body' => $req->client_name.' ('.$req->phone.')', 'data' => ['client_request_id' => $req->id]]);
-
-        return response()->json(['status' => 'success', 'message' => 'The agent has been notified.']);
+        return response('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'.$urls.'</urlset>', 200, ['Content-Type' => 'application/xml']);
     }
 }
