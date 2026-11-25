@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /resident
+Disallow: /agent
+Disallow: /security
+Disallow: /finance
+Disallow: /store

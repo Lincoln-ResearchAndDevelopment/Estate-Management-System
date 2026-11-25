@@ -4,6 +4,8 @@
  * - Fetches the CSRF cookie once, then echoes it in X-XSRF-TOKEN on mutating requests.
  * - Turns RFC 7807 problem+json errors into ApiError.
  */
+// An empty NEXT_PUBLIC_API_URL means "same origin": the Next.js server proxies /api, /sanctum and /storage
+// to Laravel (see next.config.ts), so session cookies are first-party on whatever URL the app is served from.
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
 
 export interface FieldError {

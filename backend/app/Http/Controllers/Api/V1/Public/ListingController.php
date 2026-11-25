@@ -126,8 +126,11 @@ class ListingController extends Controller
             'propertyTypes' => collect(config('estate.listings.property_types'))->map(fn ($label, $value) => compact('value', 'label'))->values(),
             'amenities' => config('estate.listings.amenities'),
             'sectors' => Sector::query()->orderBy('name')->get(['id', 'name']),
-            'contact' => collect(\App\Http\Controllers\Api\V1\Admin\SettingsController::all())
-                ->only(['estate_address', 'estate_phone', 'estate_email', 'office_hours', 'about']),
+            'contact' => (function () {
+                $s = \App\Http\Controllers\Api\V1\Admin\SettingsController::all();
+
+                return ['address' => $s['estate_address'] ?? null, 'phone' => $s['estate_phone'] ?? null, 'email' => $s['estate_email'] ?? null, 'officeHours' => $s['office_hours'] ?? null, 'about' => $s['about'] ?? null];
+            })(),
             'stats' => [
                 'liveListings' => PropertyListing::query()->publiclyVisible()->count(),
                 'forRent' => PropertyListing::query()->publiclyVisible()->where('listing_type', 'rent')->count(),

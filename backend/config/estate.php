@@ -1,6 +1,9 @@
 <?php
 
 return [
+    // Generate absolute URLs from APP_URL (set when the API sits behind the web app's proxy).
+    'force_app_url' => (bool) env('FORCE_APP_URL', false),
+
     'name' => env('ESTATE_NAME', 'Post Army Housing Estates'),
     'short_name' => env('ESTATE_SHORT_NAME', 'PAHE'),
     'code_prefix' => env('ESTATE_CODE_PREFIX', 'PAHE'),

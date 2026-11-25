@@ -1,0 +1,130 @@
+# PAHE Estate Management — full stack: MySQL, API (Laravel), queue worker, scheduler, web (Next.js), Mailpit.
+# Quick start:   ./scripts/setup-env.sh && docker compose up -d --build
+# Then open      $PUBLIC_URL (default http://localhost:3000). Test e-mails: http://localhost:8025
+# Secrets live in ./.env (git-ignored, created by setup-env.sh). Nothing secret is committed.
+
+x-api-env: &api-env
+  APP_NAME: "PAHE Estate Management"
+  APP_ENV: ${APP_ENV:-staging}
+  APP_DEBUG: "false"
+  APP_KEY: ${APP_KEY:?run ./scripts/setup-env.sh first}
+  APP_URL: ${PUBLIC_URL:-http://localhost:3000}
+  FRONTEND_URL: ${PUBLIC_URL:-http://localhost:3000}
+  FORCE_APP_URL: "true"
+  LOG_CHANNEL: stderr
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  DB_CONNECTION: mysql
+  DB_HOST: db
+  DB_PORT: "3306"
+  DB_DATABASE: pahe_estate
+  DB_USERNAME: pahe
+  DB_PASSWORD: ${DB_PASSWORD:?run ./scripts/setup-env.sh first}
+  SESSION_DRIVER: database
+  SESSION_ENCRYPT: "true"
+  SESSION_SECURE_COOKIE: ${SESSION_SECURE_COOKIE:-false}
+  SANCTUM_STATEFUL_DOMAINS: ${PUBLIC_HOST:-localhost:3000}
+  CORS_ALLOWED_ORIGINS: ${PUBLIC_URL:-http://localhost:3000}
+  TRUSTED_PROXIES: "*"
+  QUEUE_CONNECTION: database
+  CACHE_STORE: database
+  FILESYSTEM_DISK: local
+  MAIL_MAILER: ${MAIL_MAILER:-smtp}
+  MAIL_HOST: ${MAIL_HOST:-mailpit}
+  MAIL_PORT: ${MAIL_PORT:-1025}
+  MAIL_USERNAME: ${MAIL_USERNAME:-}
+  MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+  MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-no-reply@pahe.test}
+  ESTATE_NAME: "Post Army Housing Estates"
+  ESTATE_SHORT_NAME: PAHE
+  ESTATE_CODE_PREFIX: PAHE
+  MFA_ENFORCED: ${MFA_ENFORCED:-false}
+  PAYSTACK_SECRET_KEY: ${PAYSTACK_SECRET_KEY:-}
+  TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-}
+  DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-Demo@Pahe2026}
+  INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL:-}
+
+services:
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: pahe_estate
+      MYSQL_USER: pahe
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?run ./scripts/setup-env.sh first}
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  api:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      <<: *api-env
+      RUN_MIGRATIONS: "true"
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-true}
+    volumes:
+      - storage:/var/www/html/storage/app
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(@file_get_contents('http://127.0.0.1:8080/up') === false ? 1 : 0);"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    depends_on:
+      db:
+        condition: service_healthy
+
+  worker:
+    build: ./backend
+    restart: unless-stopped
+    command: ["php", "/var/www/html/artisan", "queue:work", "--tries=3", "--max-time=3600"]
+    environment: *api-env
+    healthcheck:
+      disable: true
+    volumes:
+      - storage:/var/www/html/storage/app
+    depends_on:
+      api:
+        condition: service_healthy
+
+  scheduler:
+    build: ./backend
+    restart: unless-stopped
+    command: ["php", "/var/www/html/artisan", "schedule:work"]
+    environment: *api-env
+    healthcheck:
+      disable: true
+    depends_on:
+      api:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ""
+        API_PROXY_TARGET: http://api:8080
+        NEXT_PUBLIC_SITE_URL: ${PUBLIC_URL:-http://localhost:3000}
+    restart: unless-stopped
+    environment:
+      API_INTERNAL_URL: http://api:8080
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports:
+      - "${MAILPIT_PORT:-8025}:8025"
+
+volumes:
+  db-data:
+  storage:

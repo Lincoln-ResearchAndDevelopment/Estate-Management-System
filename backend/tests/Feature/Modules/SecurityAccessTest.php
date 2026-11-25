@@ -35,7 +35,7 @@ class SecurityAccessTest extends TestCase
         $this->postJson("/api/v1/security/alerts/{$id}/transition", ['status' => 'resolved', 'note' => 'False trigger by a child; all safe.'])->assertOk();
         $this->assertSame('resolved', EmergencyAlert::find($id)->status);
         // Cannot reopen a resolved alert.
-        $this->postJson("/api/v1/security/alerts/{$id}/transition", ['status' => 'acknowledged'])->assertStatus(422);
+        $this->postJson("/api/v1/security/alerts/{$id}/transition", ['status' => 'acknowledged'])->assertStatus(409);
     }
 
     public function test_visitor_pass_check_in_consumes_entries(): void

@@ -29,6 +29,14 @@ class AppServiceProvider extends ServiceProvider
             ]);
         });
 
+        // When served through a proxy on another host, generate links (receipts, documents) on the public URL.
+        if (config('estate.force_app_url')) {
+            \Illuminate\Support\Facades\URL::forceRootUrl(config('app.url'));
+            if (str_starts_with((string) config('app.url'), 'https://')) {
+                \Illuminate\Support\Facades\URL::forceScheme('https');
+            }
+        }
+
         $this->configureRateLimiting();
         $this->configureApiDocs();
     }

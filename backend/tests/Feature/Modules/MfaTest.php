@@ -17,7 +17,7 @@ class MfaTest extends TestCase
         $this->postJson('/api/v1/auth/mfa/setup')->assertOk()->assertJsonStructure(['data' => ['secret', 'otpauthUrl']]);
         $secret = (string) $user->fresh()->mfa_secret;
         $this->postJson('/api/v1/auth/mfa/enable', ['code' => '000000'])->assertStatus(422);
-        $codes = $this->postJson('/api/v1/auth/mfa/enable', ['code' => $totp->code($secret)])->assertOk()->json('data.recoveryCodes');
+        $codes = $this->postJson('/api/v1/auth/mfa/enable', ['code' => $totp->code($secret, intdiv(time(), 30))])->assertOk()->json('data.recoveryCodes');
         $this->assertNotEmpty($codes);
 
         $this->app['auth']->forgetGuards();

@@ -39,7 +39,7 @@ class CommunityTest extends TestCase
         $this->postJson('/api/v1/conversations', ['recipient_ids' => [$other->id], 'subject' => 'Hello', 'body' => 'Hi neighbour'])->assertStatus(422);
 
         $this->signIn($manager);
-        $this->getJson("/api/v1/conversations/{$conv}/messages")->assertOk()->assertJsonCount(1, 'data');
+        $this->getJson("/api/v1/conversations/{$conv}/messages")->assertOk()->assertJsonCount(1, 'data.messages');
         $this->postJson("/api/v1/conversations/{$conv}/messages", ['body' => 'A technician will come by today.'])->assertCreated();
 
         $this->signIn($other);
@@ -72,7 +72,7 @@ class CommunityTest extends TestCase
         $this->signIn($owner);
         $this->postJson("/api/v1/store/orders/{$order->id}/status", ['status' => 'accepted'])->assertOk();
         $this->assertSame(3, $product->fresh()->stock);
-        $this->postJson("/api/v1/store/orders/{$order->id}/status", ['status' => 'delivered'])->assertStatus(422);
+        $this->postJson("/api/v1/store/orders/{$order->id}/status", ['status' => 'delivered'])->assertStatus(409);
         $this->postJson("/api/v1/store/orders/{$order->id}/status", ['status' => 'cancelled', 'reason' => 'Ran out of gas'])->assertOk();
         $this->assertSame(5, $product->fresh()->stock);
     }

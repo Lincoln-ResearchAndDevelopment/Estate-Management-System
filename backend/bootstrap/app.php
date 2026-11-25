@@ -19,6 +19,11 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         // Sanctum SPA cookie authentication for the Next.js front end (same parent domain).
         $middleware->statefulApi();
+        // Behind the Next.js proxy / a load balancer, trust X-Forwarded-* so rate limits see the real client IP.
+        // Only set TRUSTED_PROXIES when the API is not reachable directly from the internet.
+        if ($proxies = env('TRUSTED_PROXIES')) {
+            $middleware->trustProxies(at: $proxies === '*' ? '*' : array_map('trim', explode(',', $proxies)));
+        }
         $middleware->append(SecurityHeaders::class);
 
         $middleware->alias([
