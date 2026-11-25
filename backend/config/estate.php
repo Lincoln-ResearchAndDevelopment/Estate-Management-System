@@ -14,6 +14,24 @@ return [
         'max_failed_attempts' => (int) env('AUTH_MAX_FAILED_ATTEMPTS', 5),
         'lockout_minutes' => (int) env('AUTH_LOCKOUT_MINUTES', 15),
         'invite_expiry_hours' => 72,
+        // TOTP two-factor sign-in for these roles (FR-AUTH-12). Off by default outside production so
+        // demo accounts can sign in; set MFA_ENFORCED=true to require it.
+        'mfa_enforced' => (bool) env('MFA_ENFORCED', env('APP_ENV') === 'production'),
+        'mfa_roles' => ['super_admin', 'estate_manager', 'finance_officer'],
+    ],
+
+    'finance' => [
+        // Paystack secret key. When empty outside production, a built-in test checkout is used instead.
+        'paystack_secret' => env('PAYSTACK_SECRET_KEY'),
+        'paystack_url' => env('PAYSTACK_PAYMENT_URL', 'https://api.paystack.co'),
+        'bank_name' => env('ESTATE_BANK_NAME'),
+        'account_name' => env('ESTATE_ACCOUNT_NAME'),
+        'account_number' => env('ESTATE_ACCOUNT_NUMBER'),
+    ],
+
+    'security' => [
+        // Unacknowledged panic alerts escalate to EM/SA after this many seconds (WF-05).
+        'escalate_after_seconds' => (int) env('ALERT_ESCALATE_SECONDS', 60),
     ],
 
     'listings' => [

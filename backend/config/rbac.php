@@ -47,6 +47,37 @@ return [
         'listings.manage_own' => 'Manage own listings and enquiries (agents)',
         'audit.view' => 'View the audit log',
         'settings.manage' => 'Manage system settings',
+        // M03 residents
+        'residents.view' => 'View residents, households and vehicles',
+        'household.manage_own' => 'Manage own profile, household members and vehicles',
+        // M05 finance
+        'finance.view' => 'View bills, payments and financial reports',
+        'finance.manage' => 'Manage services, issue bills and record payments',
+        'finance.verify' => 'Verify or reject manual payments',
+        'finance.pay_own' => 'View and pay own household bills',
+        // M08 security & emergency
+        'alerts.raise' => 'Raise panic / emergency alerts',
+        'security.respond' => 'Acknowledge, dispatch and resolve emergency alerts',
+        'security.reports' => 'Create and manage intelligence / incident reports',
+        // M09 access control and M10 blacklist
+        'access.manage_own' => 'Create visitor passes and away notices for own household',
+        'access.gate' => 'Verify passes and record gate check-in / check-out',
+        'access.view' => 'View access logs and away notices',
+        'blacklist.view' => 'View the blacklist and watchlist',
+        'blacklist.manage' => 'Add and clear blacklist / watchlist entries',
+        // M11 staff
+        'staff.view' => 'View staff records',
+        'staff.manage' => 'Create, edit, suspend and deactivate staff',
+        // M07 communication
+        'comms.use' => 'Read notices, RSVP to meetings, post in the community feed and send messages',
+        'comms.publish' => 'Publish notices and schedule meetings',
+        'comms.moderate' => 'Hide community posts',
+        // M06 marketplace
+        'market.shop' => 'Browse stores and place orders',
+        'store.manage_own' => 'Manage own store, products and orders',
+        'stores.approve' => 'Approve, suspend and set plans for stores',
+        // M14 reports
+        'reports.view' => 'View analytics and export reports',
     ],
 
     'role_permissions' => [
@@ -55,14 +86,26 @@ return [
             'dashboard.admin', 'users.view', 'users.manage', 'users.block',
             'access_requests.view', 'access_requests.decide', 'agents.view', 'agents.decide',
             'estate.view', 'estate.manage', 'listings.review', 'listings.create', 'listings.edit_any',
-            'listings.delete_any', 'listings.approve', 'listings.feature', 'audit.view',
+            'listings.delete_any', 'listings.approve', 'listings.feature', 'audit.view', 'settings.manage',
+            'residents.view', 'finance.view', 'security.respond', 'security.reports', 'access.view',
+            'blacklist.view', 'blacklist.manage', 'staff.view', 'staff.manage', 'comms.use', 'comms.publish',
+            'comms.moderate', 'stores.approve', 'reports.view',
         ],
-        'finance_officer' => ['users.view', 'estate.view'],
-        'security_officer' => ['users.view', 'access_requests.view', 'estate.view'],
-        'resident_head' => ['estate.view'],
-        'resident_member' => ['estate.view'],
-        'store_owner' => [],
-        'staff' => ['estate.view'],
+        'finance_officer' => [
+            'dashboard.admin', 'users.view', 'estate.view', 'residents.view',
+            'finance.view', 'finance.manage', 'finance.verify', 'comms.use', 'reports.view',
+        ],
+        'security_officer' => [
+            'users.view', 'access_requests.view', 'estate.view', 'residents.view', 'security.respond',
+            'security.reports', 'access.gate', 'access.view', 'blacklist.view', 'blacklist.manage', 'comms.use',
+        ],
+        'resident_head' => [
+            'estate.view', 'household.manage_own', 'finance.pay_own', 'alerts.raise', 'access.manage_own',
+            'comms.use', 'market.shop',
+        ],
+        'resident_member' => ['estate.view', 'finance.pay_own', 'alerts.raise', 'access.manage_own', 'comms.use', 'market.shop'],
+        'store_owner' => ['store.manage_own', 'comms.use', 'market.shop'],
+        'staff' => ['estate.view', 'comms.use'],
         'agent' => ['listings.manage_own'],
     ],
 
@@ -71,10 +114,10 @@ return [
         'super_admin' => '/admin',
         'estate_manager' => '/admin',
         'finance_officer' => '/admin',
-        'security_officer' => '/admin',
+        'security_officer' => '/security',
         'resident_head' => '/resident',
         'resident_member' => '/resident',
-        'store_owner' => '/resident',
+        'store_owner' => '/store',
         'staff' => '/resident',
         'agent' => '/agent',
     ],

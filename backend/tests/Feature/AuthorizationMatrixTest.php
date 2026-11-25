@@ -28,7 +28,22 @@ class AuthorizationMatrixTest extends TestCase
 
         $this->getJson('/api/v1/admin/listings')->assertForbidden();
         $this->postJson('/api/v1/admin/listings/1/approve')->assertForbidden();
-        $this->getJson('/api/v1/admin/dashboard')->assertForbidden();
+    }
+
+    public function test_residents_agents_and_store_owners_cannot_open_admin_areas(): void
+    {
+        foreach (['resident_head', 'agent', 'store_owner', 'security_officer'] as $role) {
+            $this->signIn($role);
+            $this->getJson('/api/v1/admin/dashboard')->assertForbidden();
+            $this->getJson('/api/v1/finance/overview')->assertForbidden();
+        }
+    }
+
+    public function test_finance_officer_cannot_respond_to_alerts_or_manage_staff(): void
+    {
+        $this->signIn('finance_officer');
+        $this->getJson('/api/v1/security/alerts')->assertForbidden();
+        $this->postJson('/api/v1/staff', [])->assertForbidden();
     }
 
     public function test_only_agents_reach_the_agent_portal(): void

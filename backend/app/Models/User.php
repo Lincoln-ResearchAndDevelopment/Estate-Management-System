@@ -21,7 +21,7 @@ class User extends Authenticatable
         'name', 'email', 'phone', 'password', 'status', 'primary_role', 'avatar_path', 'must_change_password',
     ];
 
-    protected $hidden = ['password', 'remember_token'];
+    protected $hidden = ['password', 'remember_token', 'mfa_secret', 'mfa_recovery_codes'];
 
     /** @var Collection<int, string>|null */
     private ?Collection $permissionCache = null;
@@ -34,6 +34,9 @@ class User extends Authenticatable
             'last_login_at' => 'datetime',
             'password' => 'hashed',
             'must_change_password' => 'boolean',
+            'mfa_secret' => 'encrypted',
+            'mfa_recovery_codes' => 'encrypted:array',
+            'mfa_enabled_at' => 'datetime',
             'status' => UserStatus::class,
         ];
     }
@@ -51,6 +54,28 @@ class User extends Authenticatable
     public function resident(): HasOne
     {
         return $this->hasOne(Resident::class);
+    }
+
+    public function store(): HasOne
+    {
+        return $this->hasOne(Store::class, 'owner_user_id');
+    }
+
+    /** The household the user belongs to (residents only), or null. */
+    public function household(): ?Household
+    {
+        return $this->resident()->with('household.unit')->first()?->household;
+    }
+
+    public function mfaEnabled(): bool
+    {
+        return $this->mfa_enabled_at !== null;
+    }
+
+    public function mfaRequired(): bool
+    {
+        return (bool) config('estate.auth.mfa_enforced')
+            && in_array($this->primary_role, config('estate.auth.mfa_roles'), true);
     }
 
     public function hasRole(string ...$codes): bool

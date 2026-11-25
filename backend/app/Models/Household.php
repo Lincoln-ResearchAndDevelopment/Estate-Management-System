@@ -29,4 +29,30 @@ class Household extends Model
     {
         return $this->hasMany(Resident::class);
     }
+
+    public function vehicles(): HasMany
+    {
+        return $this->hasMany(Vehicle::class);
+    }
+
+    public function bills(): HasMany
+    {
+        return $this->hasMany(Bill::class);
+    }
+
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    public function passes(): HasMany
+    {
+        return $this->hasMany(VisitorPass::class);
+    }
+
+    /** Outstanding balance across open bills. */
+    public function balance(): float
+    {
+        return round((float) $this->bills()->whereIn('status', Bill::OPEN)->sum(\Illuminate\Support\Facades\DB::raw('amount - amount_paid')), 2);
+    }
 }

@@ -45,6 +45,12 @@ class AuthService
             );
         }
 
+        return $user->mfaEnabled() ? $user : $this->completeLogin($request, $user, $remember);
+    }
+
+    /** Starts the session after password (and, when enabled, two-factor) checks pass. */
+    public function completeLogin(Request $request, User $user, bool $remember): User
+    {
         Auth::guard('web')->login($user, $remember);
 
         if ($request->hasSession()) {
@@ -60,6 +66,27 @@ class AuthService
         $this->audit->log('auth.login', $user, actor: $user);
 
         return $user;
+    }
+
+    /** Short-lived signed challenge so the second step needs no half-open session. */
+    public function mfaChallenge(User $user, bool $remember): string
+    {
+        return \Illuminate\Support\Facades\Crypt::encryptString(json_encode(['uid' => $user->id, 'remember' => $remember, 'exp' => now()->addMinutes(5)->timestamp]));
+    }
+
+    /** @return array{0: User, 1: bool} */
+    public function resolveChallenge(string $challenge): array
+    {
+        try {
+            $data = json_decode(\Illuminate\Support\Facades\Crypt::decryptString($challenge), true, flags: JSON_THROW_ON_ERROR);
+        } catch (\Throwable) {
+            throw new BusinessRuleException('Your sign-in session expired. Sign in again.', 'MFA_CHALLENGE_INVALID', 401);
+        }
+        if (($data['exp'] ?? 0) < now()->timestamp) {
+            throw new BusinessRuleException('Your sign-in session expired. Sign in again.', 'MFA_CHALLENGE_EXPIRED', 401);
+        }
+
+        return [User::findOrFail($data['uid']), (bool) ($data['remember'] ?? false)];
     }
 
     public function logout(Request $request): void

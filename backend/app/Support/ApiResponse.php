@@ -26,6 +26,20 @@ class ApiResponse
         ]);
     }
 
+    /** Paginated envelope where each row is shaped by a closure (camelCase presenters). */
+    public static function paginateMap(LengthAwarePaginator $paginator, callable $map, array $extraMeta = []): JsonResponse
+    {
+        return response()->json([
+            'data' => $paginator->getCollection()->map($map)->values(),
+            'meta' => array_merge([
+                'page' => $paginator->currentPage(),
+                'pageSize' => $paginator->perPage(),
+                'total' => $paginator->total(),
+                'totalPages' => $paginator->lastPage(),
+            ], $extraMeta),
+        ]);
+    }
+
     public static function pageSize(Request $request, int $default = 10): int
     {
         return max(1, min(100, (int) $request->query('pageSize', $default)));

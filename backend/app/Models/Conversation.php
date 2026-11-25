@@ -17,7 +17,7 @@ class Conversation extends Model
 
     public function participants(): BelongsToMany
     {
-        return $this->belongsToMany(User::class, 'conversation_participants');
+        return $this->belongsToMany(User::class, 'conversation_participants')->withPivot('last_read_at');
     }
 
     public function messages(): HasMany

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -28,5 +29,11 @@ class VisitorPass extends Model
     public function logs(): HasMany
     {
         return $this->hasMany(AccessLog::class);
+    }
+
+    /** Visitors whose latest (non-refused) gate record is an entry, i.e. currently inside the estate. */
+    public function scopeInside(Builder $query): Builder
+    {
+        return $query->whereRaw("(SELECT direction FROM access_logs WHERE access_logs.visitor_pass_id = visitor_passes.id AND (flag_reason IS NULL OR flag_reason NOT LIKE 'REFUSED%') ORDER BY occurred_at DESC, id DESC LIMIT 1) = 'in'");
     }
 }

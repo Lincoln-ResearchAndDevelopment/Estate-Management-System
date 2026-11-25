@@ -22,6 +22,8 @@ class SessionResource extends JsonResource
             'permissions' => $this->permissionCodes()->values(),
             'portal' => $this->portalPath(),
             'mustChangePassword' => (bool) $this->must_change_password,
+            'mfaEnabled' => $this->mfaEnabled(),
+            'mfaSetupRequired' => $this->mfaRequired() && ! $this->mfaEnabled(),
         ];
     }
 }
