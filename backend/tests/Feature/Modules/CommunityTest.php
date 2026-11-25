@@ -43,7 +43,8 @@ class CommunityTest extends TestCase
         $this->postJson("/api/v1/conversations/{$conv}/messages", ['body' => 'A technician will come by today.'])->assertCreated();
 
         $this->signIn($other);
-        $this->getJson("/api/v1/conversations/{$conv}/messages")->assertForbidden();
+        // Non-participants get 404 so conversation IDs are not disclosed.
+        $this->getJson("/api/v1/conversations/{$conv}/messages")->assertNotFound();
     }
 
     public function test_store_approval_order_and_stock_flow(): void

@@ -14,6 +14,8 @@ const PORTAL_ACCESS: Record<Portal, string[] | "resident"> = {
   admin: ["dashboard.admin", "users.view", "listings.review", "access_requests.view", "agents.view", "audit.view"],
   agent: ["listings.manage_own"],
   resident: "resident",
+  security: ["security.respond", "access.gate", "access.view", "blacklist.view", "security.reports"],
+  store: ["store.manage_own"],
 };
 
 function FullPageLoader() {
@@ -38,11 +40,13 @@ export default function PortalLayout({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!loading && !session) router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+    // Roles that must use two-factor sign-in are sent to set it up before anything else (FR-AUTH-12).
+    else if (session?.mfaSetupRequired && !pathname.startsWith("/account/security")) router.replace("/account/security?required=1");
   }, [loading, session, pathname, router]);
 
   if (loading || !session) return <FullPageLoader />;
 
-  const isPortalPath = /^\/(admin|agent|resident)(\/|$)/.test(pathname);
+  const isPortalPath = /^\/(admin|agent|resident|security|store)(\/|$)/.test(pathname);
   const portal = isPortalPath ? portalFromPath(pathname) : portalFromSession(session.portal);
   const rule = PORTAL_ACCESS[portal];
   const allowed = rule === "resident" ? session.portal === "/resident" : can(rule);

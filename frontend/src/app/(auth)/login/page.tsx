@@ -1,16 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useState } from "react";
+import { Suspense, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Eye, EyeOff, Lock, Mail } from "lucide-react";
+import { Eye, EyeOff, Lock, Mail, ShieldCheck } from "lucide-react";
 import { ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Checkbox, Field, Input } from "@/components/ui/form";
 import { useAuth } from "@/modules/auth/auth-provider";
+import type { Session } from "@/types/api";
 
 const schema = z.object({
   email: z.string().trim().min(1, "Enter your email address.").email("Enter a valid email address."),
@@ -19,12 +20,60 @@ const schema = z.object({
 });
 type Values = z.infer<typeof schema>;
 
-function LoginForm() {
-  const { login } = useAuth();
+function useAfterSignIn() {
   const router = useRouter();
   const next = useSearchParams().get("next");
+  return (session: Session) => {
+    if (session.mustChangePassword) router.replace("/account/password?required=1");
+    else if (session.mfaSetupRequired) router.replace("/account/security?required=1");
+    else router.replace(next && next.startsWith("/") && !next.startsWith("//") ? next : session.portal);
+  };
+}
+
+/** Second step for accounts with two-factor sign-in (FR-AUTH-12). */
+function MfaStep({ challenge, onCancel }: { challenge: string; onCancel: () => void }) {
+  const { completeMfa } = useAuth();
+  const afterSignIn = useAfterSignIn();
+  const [code, setCode] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!code.trim()) return setError("Enter the 6-digit code or a recovery code.");
+    setBusy(true);
+    setError(null);
+    try {
+      afterSignIn(await completeMfa(challenge, code.trim()));
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) onCancel();
+      setError(err instanceof ApiError ? (err.fieldErrors().code ?? err.message) : "Verification failed. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} noValidate className="space-y-5">
+      <div className="flex items-start gap-3 rounded-lg bg-army-50 p-4 text-sm text-army-900">
+        <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
+        <p>Two-factor sign-in is on for this account. Open your authenticator app and enter the current code, or use one of your recovery codes.</p>
+      </div>
+      <Field label="Authentication code" htmlFor="mfa-code" error={error ?? undefined} required>
+        <Input id="mfa-code" inputMode="numeric" autoComplete="one-time-code" autoFocus maxLength={20} value={code} onChange={(e) => setCode(e.target.value)} />
+      </Field>
+      <Button type="submit" size="lg" className="w-full" loading={busy}>Verify and sign in</Button>
+      <button type="button" onClick={onCancel} className="w-full text-sm font-medium text-army-800 hover:underline">Use a different account</button>
+    </form>
+  );
+}
+
+function LoginForm() {
+  const { login } = useAuth();
+  const afterSignIn = useAfterSignIn();
   const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [challenge, setChallenge] = useState<string | null>(null);
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<Values>({
     resolver: zodResolver(schema),
@@ -34,13 +83,15 @@ function LoginForm() {
   const onSubmit = handleSubmit(async (values) => {
     setFormError(null);
     try {
-      const session = await login(values);
-      if (session.mustChangePassword) router.replace("/account/password?required=1");
-      else router.replace(next && next.startsWith("/") && !next.startsWith("//") ? next : session.portal);
+      const result = await login(values);
+      if (result.kind === "mfa") setChallenge(result.challenge);
+      else afterSignIn(result.session);
     } catch (e) {
       setFormError(e instanceof ApiError ? e.message : "Sign-in failed. Please try again.");
     }
   });
+
+  if (challenge) return <MfaStep challenge={challenge} onCancel={() => setChallenge(null)} />;
 
   return (
     <form onSubmit={onSubmit} noValidate className="space-y-5">

@@ -20,6 +20,9 @@ export interface Session {
   permissions: Permission[];
   portal: string;
   mustChangePassword: boolean;
+  mfaEnabled: boolean;
+  /** MFA is mandatory for this role but not yet set up; the portal sends the user to set it up. */
+  mfaSetupRequired: boolean;
 }
 
 export interface Money {

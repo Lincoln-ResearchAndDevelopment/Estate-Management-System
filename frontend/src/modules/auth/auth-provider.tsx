@@ -10,10 +10,14 @@ interface AuthContextValue {
   loading: boolean;
   /** Display-only permission check. The API enforces every permission again. */
   can: (permission: string | string[]) => boolean;
-  login: (input: { email: string; password: string; remember: boolean }) => Promise<Session>;
+  /** Returns the session, or an MFA challenge when the account has two-factor sign-in on. */
+  login: (input: { email: string; password: string; remember: boolean }) => Promise<LoginResult>;
+  completeMfa: (challenge: string, code: string) => Promise<Session>;
   logout: () => Promise<void>;
   refresh: () => void;
 }
+
+export type LoginResult = { kind: "session"; session: Session } | { kind: "mfa"; challenge: string };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 export const SESSION_KEY = ["auth", "session"] as const;
@@ -36,8 +40,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const loginMutation = useMutation({
-    mutationFn: async (input: { email: string; password: string; remember: boolean }) =>
-      (await api.post<{ data: Session }>("/auth/login", input)).data,
+    mutationFn: async (input: { email: string; password: string; remember: boolean }): Promise<LoginResult> => {
+      const res = await api.post<{ data: Session | { mfaRequired: true; challenge: string } }>("/auth/login", input);
+      if ("mfaRequired" in res.data) return { kind: "mfa", challenge: res.data.challenge };
+      return { kind: "session", session: res.data };
+    },
+    onSuccess: (result) => {
+      if (result.kind === "session") queryClient.setQueryData(SESSION_KEY, result.session);
+    },
+  });
+
+  const mfaMutation = useMutation({
+    mutationFn: async ({ challenge, code }: { challenge: string; code: string }) =>
+      (await api.post<{ data: Session }>("/auth/mfa/challenge", { challenge, code })).data,
     onSuccess: (session) => queryClient.setQueryData(SESSION_KEY, session),
   });
 
@@ -66,6 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading: isLoading,
         can,
         login: loginMutation.mutateAsync,
+        completeMfa: (challenge: string, code: string) => mfaMutation.mutateAsync({ challenge, code }),
         logout,
         refresh: () => queryClient.invalidateQueries({ queryKey: SESSION_KEY }),
       }}

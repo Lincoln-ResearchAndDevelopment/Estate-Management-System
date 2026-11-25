@@ -66,3 +66,10 @@
     @apply rounded-[var(--radius-card)] border border-line bg-white shadow-[var(--shadow-card)];
   }
 }
+
+/* Printing a receipt or report prints only the marked area. */
+@media print {
+  body * { visibility: hidden; }
+  .printable, .printable * { visibility: visible; }
+  .printable { position: absolute; inset: 0 auto auto 0; width: 100%; padding: 1.5rem; }
+}

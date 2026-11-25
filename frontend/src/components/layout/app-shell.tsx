@@ -52,7 +52,22 @@ function useBadges(portal: Portal, can: (p: string | string[]) => boolean) {
     refetchInterval: 60_000,
   });
 
+  const messages = useQuery({
+    queryKey: ["conversations", "unread"],
+    queryFn: () => api.get<{ meta: { unreadCount: number } }>("/conversations", { pageSize: 1 }),
+    enabled: can("comms.use"),
+    refetchInterval: 30_000,
+  });
+  const security = useQuery({
+    queryKey: ["security", "overview"],
+    queryFn: () => api.get<{ data: { kpis: { activeAlerts: number } } }>("/security/overview"),
+    enabled: portal === "security" && can("security.respond"),
+    refetchInterval: 10_000,
+  });
+
   return {
+    unreadMessages: messages.data?.meta.unreadCount,
+    activeAlerts: security.data?.data.kpis.activeAlerts,
     pendingListings: admin.data?.data.kpis.pendingListings?.value,
     pendingAccessRequests: admin.data?.data.kpis.pendingAccessRequests?.value,
     pendingAgents: admin.data?.data.kpis.pendingAgents?.value,

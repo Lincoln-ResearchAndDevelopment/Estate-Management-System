@@ -70,7 +70,7 @@ class SecurityController extends Controller
                 'activeAlerts' => EmergencyAlert::whereIn('status', EmergencyAlert::ACTIVE)->count(),
                 'alertsToday' => EmergencyAlert::where('created_at', '>=', $today)->count(),
                 'visitorsInside' => VisitorPass::query()->inside()->count(),
-                'entriesToday' => AccessLog::where('direction', 'in')->where('occurred_at', '>=', $today)->where('flag_reason', 'not like', 'REFUSED%')->count(),
+                'entriesToday' => AccessLog::where('direction', 'in')->where('occurred_at', '>=', $today)->where(fn ($q) => $q->whereNull('flag_reason')->orWhere('flag_reason', 'not like', 'REFUSED%'))->count(),
                 'refusedToday' => AccessLog::where('flag_reason', 'like', 'REFUSED%')->where('occurred_at', '>=', $today)->count(),
                 'openIncidents' => IncidentReport::where('status', '!=', 'closed')->count(),
                 'awayHouseholds' => AwayNotice::where('status', 'active')->whereDate('from_date', '<=', now())->whereDate('to_date', '>=', now())->count(),
