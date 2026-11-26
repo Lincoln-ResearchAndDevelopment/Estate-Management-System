@@ -62,10 +62,7 @@ jobs:
         run: npx -y @devcontainers/cli@latest up --workspace-folder . --skip-post-create
       - name: Docker and Compose work inside it
         run: |
-          npx -y @devcontainers/cli@latest exec --workspace-folder . docker version
-          npx -y @devcontainers/cli@latest exec --workspace-folder . docker compose version
-          npx -y @devcontainers/cli@latest exec --workspace-folder . bash scripts/setup-env.sh
-          npx -y @devcontainers/cli@latest exec --workspace-folder . docker compose config --quiet
+          npx -y @devcontainers/cli@latest exec --workspace-folder . bash scripts/codespace-start.sh --check
 
   e2e:
     name: End-to-end (Docker stack + Playwright)

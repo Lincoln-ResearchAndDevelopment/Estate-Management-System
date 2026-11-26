@@ -17,6 +17,6 @@
     "3000": { "label": "PAHE web app", "onAutoForward": "openBrowser" },
     "8025": { "label": "Test mailbox (Mailpit)", "onAutoForward": "silent" }
   },
-  "postCreateCommand": "bash scripts/setup-env.sh && docker compose up -d --build",
-  "postStartCommand": "bash scripts/setup-env.sh && docker compose up -d"
+  "postCreateCommand": "bash scripts/codespace-start.sh",
+  "postStartCommand": "bash scripts/codespace-start.sh"
 }
