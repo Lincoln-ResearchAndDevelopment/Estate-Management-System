@@ -63,6 +63,12 @@ jobs:
       - name: Docker and Compose work inside it
         run: |
           npx -y @devcontainers/cli@latest exec --workspace-folder . bash scripts/codespace-start.sh --check
+      - name: Docker daemon diagnostics
+        if: failure()
+        run: |
+          npx -y @devcontainers/cli@latest exec --workspace-folder . bash -c 'ps aux | grep -i docker; echo ---; tail -n 60 /tmp/dockerd.log 2>/dev/null || echo "no /tmp/dockerd.log"' || true
+          docker ps -a
+          docker inspect --format '{{json .Config.Entrypoint}} {{json .Config.Cmd}}' $(docker ps -q | head -1) || true
 
   e2e:
     name: End-to-end (Docker stack + Playwright)
