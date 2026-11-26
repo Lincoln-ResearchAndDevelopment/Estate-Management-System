@@ -7,7 +7,10 @@
     "ghcr.io/devcontainers/features/docker-in-docker:2": {
       "version": "latest",
       "moby": true,
-      "dockerDashComposeVersion": "v2"
+      "dockerDashComposeVersion": "v2",
+      // Keep the nftables backend: current host kernels no longer provide the legacy iptables "nat" table,
+      // and dockerd exits with "can't initialize iptables table `nat'" when forced onto iptables-legacy.
+      "iptables": false
     }
   },
   // A 2-core codespace has 8 GB RAM, enough for MySQL + the image builds. 4-core builds faster if offered.
