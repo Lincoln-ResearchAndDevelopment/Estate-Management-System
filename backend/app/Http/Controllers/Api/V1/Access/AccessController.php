@@ -13,6 +13,7 @@ use App\Services\AuditLogger;
 use App\Services\Security\AccessService;
 use App\Support\ApiResponse;
 use App\Support\Present;
+use App\Support\QrPayload;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -33,7 +34,7 @@ class AccessController extends Controller
 
         VisitorPass::query()->where('household_id', $household->id)->where('status', 'active')->where('valid_until', '<', now())->update(['status' => 'expired']);
 
-        $page = VisitorPass::query()->with('creator')->where('household_id', $household->id)
+        $page = VisitorPass::query()->with(['creator', 'household.unit'])->where('household_id', $household->id)
             ->when($status, fn ($q, $v) => $q->where('status', $v))
             ->latest()->paginate(ApiResponse::pageSize($request));
 
@@ -108,12 +109,60 @@ class AccessController extends Controller
 
     // ------------------------------------------------------------ gate (security officers)
 
+    /**
+     * Gate check of a scanned QR code or a typed 6-character visitor code. Resident estate passes return
+     * the resident and their dues clearance; visitor passes return validity and blacklist screening.
+     */
+    /** GET /public/passes/{token} — what a visitor sees when they open the link the resident shared. */
+    public function publicPass(string $token): JsonResponse
+    {
+        abort_unless(preg_match('/^[A-Za-z0-9]{40}$/', $token) === 1, 404);
+        $pass = VisitorPass::query()->with(['household.unit', 'creator'])->where('qr_token', $token)->firstOrFail();
+        $data = Present::pass($pass);
+
+        // Only what the visitor needs at the gate; no resident phone numbers or entry history.
+        return response()->json(['data' => [
+            'visitorName' => $data['visitorName'],
+            'code' => $data['code'],
+            'qrPayload' => $data['qrPayload'],
+            'validFrom' => $data['validFrom'],
+            'validUntil' => $data['validUntil'],
+            'status' => $data['status'],
+            'entriesLeft' => max(0, $pass->max_entries - $pass->entries_used),
+            'host' => $pass->creator ? strtok($pass->creator->name, ' ') : null,
+            'unit' => $data['unit'],
+            'estate' => config('estate.name'),
+        ]]);
+    }
+
     public function verifyPass(Request $request): JsonResponse
     {
-        $code = $request->validate(['code' => ['required', 'string', 'max:12']])['code'];
+        $code = $request->validate(['code' => ['required', 'string', 'max:200']])['code'];
+
+        if (QrPayload::parse($code)['type'] === 'resident') {
+            $result = $this->access->verifyResident(QrPayload::parse($code)['value']);
+            $resident = $result['resident'];
+
+            return response()->json(['data' => [
+                'kind' => 'resident',
+                'valid' => true,
+                'resident' => [
+                    'name' => $resident->full_name,
+                    'relationship' => $resident->relationship,
+                    'phone' => $resident->phone ?? $resident->user?->phone,
+                    'householdId' => $resident->household_id,
+                    'unit' => $resident->household?->unit?->unit_code,
+                    'street' => $resident->household?->unit?->street?->name,
+                ],
+                'cleared' => $result['clearance']['cleared'],
+                'outstanding' => Present::money($result['clearance']['outstanding']),
+            ]]);
+        }
+
         $result = $this->access->verifyCode($code);
 
         return response()->json(['data' => [
+            'kind' => 'visitor',
             'valid' => $result['valid'],
             'reason' => $result['reason'],
             'pass' => Present::pass($result['pass']),
@@ -125,7 +174,7 @@ class AccessController extends Controller
     {
         $data = $request->validate([
             'direction' => ['required', Rule::in(['in', 'out'])],
-            'pass_code' => ['nullable', 'string', 'max:12'],
+            'pass_code' => ['nullable', 'string', 'max:200'],
             'subject_type' => ['nullable', Rule::in(['visitor', 'resident', 'staff', 'vehicle', 'contractor'])],
             'person_name' => ['required_without:pass_code', 'nullable', 'string', 'max:120'],
             'phone' => ['nullable', 'string', 'max:20'],

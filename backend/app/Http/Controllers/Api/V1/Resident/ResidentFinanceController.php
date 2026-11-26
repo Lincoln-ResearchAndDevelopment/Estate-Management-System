@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Bill;
 use App\Models\Household;
 use App\Models\Payment;
+use App\Services\Finance\BillingService;
 use App\Services\Finance\PaymentService;
 use App\Support\ApiResponse;
 use App\Support\Present;
@@ -47,6 +48,29 @@ class ResidentFinanceController extends Controller
             ->latest()->paginate(ApiResponse::pageSize($request));
 
         return ApiResponse::paginateMap($page, fn ($p) => Present::payment($p));
+    }
+
+    /**
+     * POST /resident/bills/months — prepares bills for the months the resident picked (creating bills for
+     * upcoming months that have not been raised yet) and returns them, ready to pay online or by transfer.
+     */
+    public function billMonths(Request $request, BillingService $billing): JsonResponse
+    {
+        $household = $this->household($request);
+        $periods = $request->validate([
+            'periods' => ['required', 'array', 'min:1', 'max:24'],
+            'periods.*' => ['string', 'regex:/^\d{4}-(0[1-9]|1[0-2])$/'],
+        ])['periods'];
+        $bills = $billing->billMonths($household, $periods, $request->user());
+        if ($bills->isEmpty()) {
+            throw BusinessRuleException::invalidState('Nothing is owed for the months you selected.');
+        }
+
+        return response()->json(['data' => [
+            'billIds' => $bills->pluck('id')->values(),
+            'total' => Present::money($bills->sum(fn (Bill $b) => $b->balance())),
+            'bills' => $bills->map(fn ($b) => Present::bill($b->load('service')))->values(),
+        ]]);
     }
 
     public function initiate(Request $request): JsonResponse

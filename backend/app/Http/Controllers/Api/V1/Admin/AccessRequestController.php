@@ -44,12 +44,12 @@ class AccessRequestController extends Controller
         return new AccessRequestResource($accessRequest->load(['unit.street', 'reviewer']));
     }
 
-    /** Streams the private identity images to reviewers only. */
+    /** Streams the applicant's private profile picture (if they supplied one) to reviewers only. */
     public function file(AccessRequest $accessRequest, string $kind): StreamedResponse
     {
-        abort_unless(in_array($kind, ['photo', 'face'], true), 404);
-        $path = $kind === 'photo' ? $accessRequest->profile_photo_path : $accessRequest->face_capture_path;
-        abort_unless(Storage::disk('local')->exists($path), 404);
+        abort_unless($kind === 'photo', 404);
+        $path = $accessRequest->profile_photo_path;
+        abort_unless($path && Storage::disk('local')->exists($path), 404);
 
         return Storage::disk('local')->response($path, null, ['Cache-Control' => 'private, no-store']);
     }

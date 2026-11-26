@@ -15,7 +15,7 @@ class AccessRequest extends Model
 
     protected $fillable = [
         'reference', 'full_name', 'email', 'phone', 'relationship', 'unit_id', 'nin_encrypted', 'nin_hash',
-        'password_hash', 'declarations', 'profile_photo_path', 'face_capture_path', 'status', 'reviewed_by',
+        'password_hash', 'declarations', 'profile_photo_path', 'status', 'reviewed_by',
         'reviewed_at', 'decision_reason', 'created_user_id',
     ];
 

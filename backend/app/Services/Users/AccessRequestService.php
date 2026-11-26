@@ -29,7 +29,7 @@ class AccessRequestService
         private readonly UserAccountService $accounts,
     ) {}
 
-    public function submit(array $data, UploadedFile $photo, UploadedFile $face): AccessRequest
+    public function submit(array $data, ?UploadedFile $photo = null): AccessRequest
     {
         $email = strtolower($data['email']);
         $ninHash = AccessRequest::hashNin($data['national_id']);
@@ -43,7 +43,7 @@ class AccessRequestService
             throw BusinessRuleException::duplicate('A request with this email or National ID is already awaiting review.');
         }
 
-        $request = DB::transaction(function () use ($data, $email, $ninHash, $photo, $face) {
+        $request = DB::transaction(function () use ($data, $email, $ninHash, $photo) {
             return AccessRequest::create([
                 'reference' => $this->codes->next('access_requests', 'reference', 'AR'),
                 'full_name' => $data['full_name'],
@@ -59,9 +59,8 @@ class AccessRequestService
                     'infoCorrect' => (bool) $data['declaration_info_correct'],
                     'agreeRules' => (bool) $data['declaration_agree_rules'],
                 ],
-                // Identity images are private: stored on the local (non-public) disk.
-                'profile_photo_path' => $photo->store('access-requests/photos', 'local'),
-                'face_capture_path' => $face->store('access-requests/faces', 'local'),
+                // The optional profile picture is private: stored on the local (non-public) disk.
+                'profile_photo_path' => $photo?->store('access-requests/photos', 'local'),
                 'status' => 'pending',
             ]);
         });

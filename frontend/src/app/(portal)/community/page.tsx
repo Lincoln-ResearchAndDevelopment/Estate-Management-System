@@ -16,6 +16,7 @@ import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states";
 import { StatusPill } from "@/components/ui/status-pill";
 import { useAuth } from "@/modules/auth/auth-provider";
 import type { Post } from "@/types/modules";
+import { MessagesTabs } from "@/components/shared/link-tabs";
 
 /** M07 community feed: residents and staff post and comment; moderators can hide posts with a reason. */
 export default function CommunityPage() {
@@ -57,6 +58,7 @@ export default function CommunityPage() {
   return (
     <>
       <PageHeader title="Community feed" description="Share news, ask for recommendations and help neighbours. Keep it respectful — posts are moderated." breadcrumbs={[{ label: "Community feed" }]} />
+      <MessagesTabs />
       <Card className="mb-6 p-4">
         <Textarea rows={3} maxLength={2000} value={body} onChange={(e) => setBody(e.target.value)} placeholder="Share something with the estate…" aria-label="New post" />
         <div className="mt-3 flex items-center justify-between">

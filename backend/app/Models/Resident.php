@@ -7,7 +7,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Resident extends Model
 {
-    protected $fillable = ['household_id', 'user_id', 'full_name', 'relationship', 'phone', 'status', 'moved_in_date'];
+    protected $fillable = ['household_id', 'user_id', 'full_name', 'relationship', 'phone', 'status', 'moved_in_date', 'pass_token'];
+
+    protected $hidden = ['pass_token'];
 
     protected function casts(): array
     {

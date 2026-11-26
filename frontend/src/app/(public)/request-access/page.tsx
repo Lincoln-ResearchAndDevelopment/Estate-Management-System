@@ -38,8 +38,8 @@ const schema = z
     declaration_inside_estate: mustTick,
     declaration_info_correct: mustTick,
     declaration_agree_rules: mustTick,
-    profile_photo: z.instanceof(File).nullable().refine((f) => f !== null, "Upload a profile photo."),
-    face_capture: z.instanceof(File).nullable().refine((f) => f !== null, "Take a face photo."),
+    // Optional: helps the estate office and the gate recognise the resident.
+    profile_photo: z.instanceof(File).nullable(),
   })
   .refine((v) => v.password === v.password_confirmation, { path: ["password_confirmation"], message: "Passwords do not match." });
 type Values = z.infer<typeof schema>;
@@ -57,7 +57,7 @@ export default function RequestAccessPage() {
 
   const { register, control, handleSubmit, setValue, setError: setFieldError, formState: { errors, isSubmitting } } = useForm<Values>({
     resolver: zodResolver(schema),
-    defaultValues: { phone: "+234", profile_photo: null, face_capture: null } as unknown as Partial<Values>,
+    defaultValues: { phone: "+234", profile_photo: null } as unknown as Partial<Values>,
   });
 
   const lookupActive = debouncedUnit.length >= 2 && selectedUnit?.code !== debouncedUnit;
@@ -169,12 +169,9 @@ export default function RequestAccessPage() {
           </Field>
         </div>
 
-        <div className="grid gap-5 sm:grid-cols-2">
+        <div className="sm:max-w-sm">
           <Controller name="profile_photo" control={control} render={({ field }) => (
-            <FileInput label="Profile picture" accept="image/jpeg,image/png" maxMb={5} value={field.value} onChange={field.onChange} error={errors.profile_photo?.message} hint="JPG or PNG, max 5 MB" required />
-          )} />
-          <Controller name="face_capture" control={control} render={({ field }) => (
-            <FileInput label="Face verification photo" accept="image/jpeg,image/png" maxMb={5} value={field.value} onChange={field.onChange} error={errors.face_capture?.message} hint="Look straight at the camera in good light" capture="user" required />
+            <FileInput label="Profile picture (optional)" accept="image/jpeg,image/png" maxMb={5} value={field.value} onChange={field.onChange} error={errors.profile_photo?.message} hint="JPG or PNG, max 5 MB" />
           )} />
         </div>
 

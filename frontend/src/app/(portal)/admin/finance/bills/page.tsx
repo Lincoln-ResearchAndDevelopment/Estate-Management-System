@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { Ban, Download, Plus } from "lucide-react";
+import { Ban, CheckCircle2, Download, Plus } from "lucide-react";
 import { API_URL, api, ApiError, type Paginated } from "@/lib/api";
 import { formatDate, formatNaira, titleCase } from "@/lib/format";
 import { useAction } from "@/hooks/use-action";
@@ -27,6 +27,8 @@ export default function BillsPage() {
   const q = useDebouncedValue(params.q);
   const [issueOpen, setIssueOpen] = useState(false);
   const [voidId, setVoidId] = useState<number | null>(null);
+  const [markPaid, setMarkPaid] = useState<Bill | null>(null);
+  const [method, setMethod] = useState("bank_transfer");
   const manage = can("finance.manage");
 
   const services = useQuery({ queryKey: ["finance", "services"], queryFn: () => api.get<{ data: Service[] }>("/finance/services") });
@@ -43,7 +45,14 @@ export default function BillsPage() {
     { key: "amount", header: "Amount", cell: (b) => formatNaira(b.amount.amount, { decimals: true }), hideOnMobile: true },
     { key: "balance", header: "Balance", cell: (b) => formatNaira(b.balance.amount, { decimals: true }) },
     { key: "status", header: "Status", cell: (b) => <StatusPill status={b.status} /> },
-    { key: "act", header: "", cell: (b) => manage && b.status === "unpaid" && <Button size="sm" variant="ghost" className="text-danger-600" aria-label={`Void ${b.reference}`} onClick={() => setVoidId(b.id)}><Ban className="h-4 w-4" /></Button> },
+    {
+      key: "act", header: "", cell: (b) => manage && ["unpaid", "part_paid", "overdue"].includes(b.status) && (
+        <div className="flex justify-end gap-1">
+          <Button size="sm" variant="outline" onClick={() => setMarkPaid(b)}><CheckCircle2 className="h-4 w-4" /> Mark paid</Button>
+          {b.status === "unpaid" && <Button size="sm" variant="ghost" className="text-danger-600" aria-label={`Void ${b.reference}`} onClick={() => setVoidId(b.id)}><Ban className="h-4 w-4" /></Button>}
+        </div>
+      ),
+    },
   ];
 
   return (
@@ -68,6 +77,18 @@ export default function BillsPage() {
         {data && <Pagination {...data.meta} onPageChange={(page) => update({ page })} />}
       </Card>
       {issueOpen && <IssueModal onClose={() => setIssueOpen(false)} onDone={() => { setIssueOpen(false); refetch(); }} />}
+      <Modal open={!!markPaid} onClose={() => setMarkPaid(null)} title="Approve as paid"
+        description={markPaid ? `Records ${formatNaira(markPaid.balance.amount, { decimals: true })} for ${markPaid.description}, Unit ${markPaid.unit ?? "—"}, issues a receipt and clears the resident's estate pass if nothing else is due.` : undefined}
+        footer={<><Button variant="outline" onClick={() => setMarkPaid(null)}>Cancel</Button><Button loading={busy === "paid"} onClick={async () => {
+          if (!markPaid) return;
+          await run("paid", () => api.post("/finance/payments/record", { household_id: markPaid.householdId, amount: Number(markPaid.balance.amount), method, bill_ids: [markPaid.id], note: `Marked paid from bill ${markPaid.reference}` }), "Bill marked paid and receipt issued.");
+          setMarkPaid(null);
+          refetch();
+        }}>Approve as paid</Button></>}>
+        <Field label="How was it paid?" htmlFor="mp-method">
+          <Select id="mp-method" value={method} onChange={(e) => setMethod(e.target.value)}><option value="bank_transfer">Bank transfer</option><option value="cash">Cash</option><option value="pos">POS</option></Select>
+        </Field>
+      </Modal>
       <ReasonDialog open={!!voidId} onClose={() => setVoidId(null)} title="Void this bill" description="The resident will no longer owe it. This is recorded in the audit log." confirmLabel="Void bill" destructive loading={busy === "void"}
         presets={["Raised in error", "Raised against the wrong unit", "Waived by estate management", "Other"]}
         onSubmit={async (reason) => { await run("void", () => api.post(`/finance/bills/${voidId}/void`, { reason }), "Bill voided."); setVoidId(null); refetch(); }} />

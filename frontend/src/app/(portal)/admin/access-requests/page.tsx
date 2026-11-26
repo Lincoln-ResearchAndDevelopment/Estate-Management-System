@@ -136,13 +136,15 @@ export default function AccessRequestsPage() {
               )}
             </dl>
             <div className="space-y-3">
-              {[["Profile photo", selected.photoUrl], ["Face capture", selected.faceUrl]].map(([label, url]) => (
-                <figure key={label}>
+              {selected.photoUrl ? (
+                <figure>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={url} alt={`${label} of ${selected.fullName}`} className="aspect-square w-full rounded-lg border border-line bg-canvas object-cover" />
-                  <figcaption className="mt-1 text-xs text-ink-600">{label}</figcaption>
+                  <img src={selected.photoUrl} alt={`Profile picture of ${selected.fullName}`} className="aspect-square w-full rounded-lg border border-line bg-canvas object-cover" />
+                  <figcaption className="mt-1 text-xs text-ink-600">Profile picture</figcaption>
                 </figure>
-              ))}
+              ) : (
+                <p className="rounded-lg border border-dashed border-line p-4 text-center text-xs text-ink-600">No profile picture supplied (optional).</p>
+              )}
             </div>
           </div>
         )}

@@ -12,7 +12,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState, ErrorState } from "@/components/ui/states";
 import { StatusPill } from "@/components/ui/status-pill";
 import { useAuth } from "@/modules/auth/auth-provider";
-import { AlertModal } from "@/modules/security/alert-panel";
+import { AlertModal, useIsSecurityTeam } from "@/modules/security/alert-panel";
 import type { AccessLog, Alert } from "@/types/modules";
 
 interface Overview {
@@ -26,7 +26,8 @@ interface Overview {
 export default function SecurityDashboard() {
   const { can } = useAuth();
   const [openId, setOpenId] = useState<number | null>(null);
-  const responder = can("security.respond");
+  const responder = can(["security.respond", "security.view"]);
+  const securityTeam = useIsSecurityTeam();
   const { data, isLoading, error, refetch, dataUpdatedAt } = useQuery({
     queryKey: ["security", "overview"],
     queryFn: () => api.get<{ data: Overview }>("/security/overview"),
@@ -74,7 +75,7 @@ export default function SecurityDashboard() {
                           <p className="text-xs text-ink-600">{a.raisedBy?.name} · {formatRelative(a.createdAt)}{a.escalated ? " · ESCALATED" : ""}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2"><StatusPill status={a.status} /><Button size="sm" onClick={() => setOpenId(a.id)}>Respond</Button></div>
+                      <div className="flex items-center gap-2"><StatusPill status={a.status} /><Button size="sm" variant={securityTeam ? "primary" : "outline"} onClick={() => setOpenId(a.id)}>{securityTeam ? "Respond" : "View"}</Button></div>
                     </li>
                   ))}
                 </ul>

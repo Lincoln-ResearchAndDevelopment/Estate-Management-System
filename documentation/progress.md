@@ -40,6 +40,25 @@ data, and screenshots reviewed. It does **not** yet mean client acceptance (UAT)
 | M16 Listings & landing page | Complete | Complete | Complete | Complete | Complete | Complete | Pending UAT |
 | Deployment (Docker, Codespaces, VPS + HTTPS) | — | — | — | — | — | Complete (CI boots the stack) | Pending first real server deploy |
 
+## Client feedback round 1 (26 Nov 2026) — PR #2
+
+| Change | Status |
+|---|---|
+| Visitor passes are QR codes (share link, PNG download, public pass page); gate scans with the camera | Complete (E2E: pass created with QR, gate check-in) |
+| Resident estate pass (QR) shows Cleared / Not cleared; updates when finance confirms payment; gate sees it on scan | Complete (backend tests cover transfer → approve → cleared) |
+| Residents pick months to pay, including up to 12 months ahead; monthly charge from finance shown on dashboard | Complete (E2E: pay a month via test checkout) |
+| Finance "Mark paid" (approve as paid) on bills | Complete |
+| PANIC button at the foot of the resident sidebar above Sign out | Complete (E2E) |
+| Only security officers acknowledge/dispatch/resolve alerts; management and super admin watch read-only | Complete (backend test + E2E) |
+| Resident menu exactly as Figma node 295:2443: Dashboard, Finance, Marketplace, Messages, Report, Direction | Complete (E2E asserts the menu) |
+| Report page (resident → security incidents) and Direction page (gate pin, directions, street directory, print ID card) | Complete |
+| Registration: profile picture optional, face verification photo removed | Complete (backend test) |
+
+Notes:
+- Camera scanning needs HTTPS (Codespaces and the production setup both use HTTPS) and a browser camera permission; the 6-character backup code still works everywhere.
+- Paystack online payments are confirmed by Paystack itself and count as paid immediately; bank transfers and offline payments wait for finance approval.
+- The gate map pin appears once an administrator sets the gate latitude/longitude in Settings.
+
 ## Known gaps (not built or not verified)
 
 - **Mobile width not checked.** Layouts are responsive (tables become cards below 768 px) but no 390 px screenshots

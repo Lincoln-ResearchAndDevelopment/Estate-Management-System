@@ -4,11 +4,12 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Bell, ChevronsLeft, ChevronsRight, LogOut, Menu, X } from "lucide-react";
+import { Bell, ChevronDown, ChevronsLeft, ChevronsRight, KeyRound, LogOut, Menu, ShieldCheck, UserCircle, X } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { formatRelative } from "@/lib/format";
 import { useAuth } from "@/modules/auth/auth-provider";
+import { PanicButton } from "@/modules/security/panic-button";
 import { Brand } from "@/components/shared/brand";
 import type { AppNotification, Paginated } from "@/types/api";
 import { NAVIGATION, PORTAL_SUBTITLE, type NavItem, type Portal } from "./nav";
@@ -61,7 +62,7 @@ function useBadges(portal: Portal, can: (p: string | string[]) => boolean) {
   const security = useQuery({
     queryKey: ["security", "overview"],
     queryFn: () => api.get<{ data: { kpis: { activeAlerts: number } } }>("/security/overview"),
-    enabled: portal === "security" && can("security.respond"),
+    enabled: portal === "security" && can(["security.respond", "security.view"]),
     refetchInterval: 10_000,
   });
 
@@ -84,9 +85,10 @@ function NavLinks({ portal, collapsed, onNavigate }: { portal: Portal; collapsed
     .map((s) => ({ ...s, items: s.items.filter((i) => !i.permissions?.length || can(i.permissions)) }))
     .filter((s) => s.items.length > 0);
 
-  const isActive = (href: string) => {
-    const roots = ["/admin", "/agent", "/resident"];
-    return roots.includes(href) ? pathname === href : pathname === href || pathname.startsWith(href + "/");
+  const under = (href: string) => pathname === href || pathname.startsWith(href + "/");
+  const isActive = (item: NavItem) => {
+    const roots = ["/admin", "/agent", "/resident", "/security", "/store"];
+    return (roots.includes(item.href) ? pathname === item.href : under(item.href)) || (item.also ?? []).some(under);
   };
 
   return (
@@ -96,7 +98,7 @@ function NavLinks({ portal, collapsed, onNavigate }: { portal: Portal; collapsed
           {section.title && !collapsed && <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-khaki-400/80">{section.title}</p>}
           <ul className="space-y-0.5">
             {section.items.map((item) => {
-              const active = isActive(item.href);
+              const active = isActive(item);
               const badge = item.badgeKey ? badges[item.badgeKey] : undefined;
               return (
                 <li key={item.href}>
@@ -195,8 +197,53 @@ function NotificationBell() {
   );
 }
 
+/** User chip menu (CMP-01: Profile, Settings, Logout). Holds account pages that have no sidebar entry. */
+function UserMenu({ portal, initials, onLogout }: { portal: Portal; initials: string; onLogout: () => void }) {
+  const { session, can } = useAuth();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const close = (e: MouseEvent) => ref.current && !ref.current.contains(e.target as Node) && setOpen(false);
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, []);
+
+  const items = [
+    portal === "resident" && can(["finance.pay_own", "household.manage_own"]) ? { href: "/resident/household", label: "My profile & household", icon: UserCircle } : null,
+    { href: "/notifications", label: "Notifications", icon: Bell },
+    { href: "/account/security", label: "Sign-in security", icon: ShieldCheck },
+    { href: "/account/password", label: "Change password", icon: KeyRound },
+  ].filter(Boolean) as { href: string; label: string; icon: typeof Bell }[];
+
+  return (
+    <div className="relative border-l border-line pl-3" ref={ref}>
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-haspopup="menu" className="flex items-center gap-3 rounded-lg p-1 hover:bg-army-50">
+        <div className="hidden text-right sm:block">
+          <p className="text-sm font-medium leading-tight text-ink-900">{session?.user.name}</p>
+          <p className="text-xs leading-tight text-ink-600">{session?.user.roles?.[0]?.name ?? session?.user.primaryRole}</p>
+        </div>
+        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-army-800 text-sm font-semibold text-white" aria-hidden>{initials}</span>
+        <ChevronDown className="hidden h-4 w-4 text-ink-400 sm:block" aria-hidden />
+      </button>
+      {open && (
+        <div role="menu" className="absolute right-0 z-40 mt-2 w-60 overflow-hidden rounded-xl border border-line bg-white py-1 shadow-lg">
+          {items.map((i) => (
+            <Link key={i.href} role="menuitem" href={i.href} onClick={() => setOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-ink-900 hover:bg-canvas">
+              <i.icon className="h-4 w-4 text-ink-600" aria-hidden />{i.label}
+            </Link>
+          ))}
+          <button type="button" role="menuitem" onClick={onLogout} className="flex w-full items-center gap-3 border-t border-line px-4 py-2.5 text-sm text-ink-900 hover:bg-canvas">
+            <LogOut className="h-4 w-4 text-ink-600" aria-hidden />Sign out
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function AppShell({ portal, children }: { portal: Portal; children: ReactNode }) {
-  const { session, logout } = useAuth();
+  const { session, logout, can } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const collapsed = useSyncExternalStore(subscribeCollapse, readCollapse, () => false);
@@ -223,7 +270,8 @@ export function AppShell({ portal, children }: { portal: Portal; children: React
         <Brand inverted subtitle={PORTAL_SUBTITLE[portal]} compact={collapsed && !isMobile} />
       </div>
       <NavLinks portal={portal} collapsed={collapsed && !isMobile} onNavigate={isMobile ? () => setMobileOpen(false) : undefined} />
-      <div className="border-t border-white/10 p-3">
+      <div className="space-y-2 border-t border-white/10 p-3">
+        {portal === "resident" && can("alerts.raise") && <PanicButton collapsed={collapsed && !isMobile} onDone={isMobile ? () => setMobileOpen(false) : undefined} />}
         <button
           type="button"
           onClick={handleLogout}
@@ -271,15 +319,7 @@ export function AppShell({ portal, children }: { portal: Portal; children: React
           </button>
           <div className="flex-1" />
           <NotificationBell />
-          <div className="flex items-center gap-3 border-l border-line pl-3">
-            <div className="hidden text-right sm:block">
-              <p className="text-sm font-medium leading-tight text-ink-900">{session?.user.name}</p>
-              <p className="text-xs leading-tight text-ink-600">{session?.user.roles?.[0]?.name ?? session?.user.primaryRole}</p>
-            </div>
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-army-800 text-sm font-semibold text-white" aria-hidden>
-              {initials}
-            </span>
-          </div>
+          <UserMenu portal={portal} initials={initials} onLogout={handleLogout} />
         </header>
         <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
       </div>

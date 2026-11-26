@@ -35,8 +35,7 @@ class SubmitAccessRequest extends FormRequest
             'declaration_inside_estate' => ['accepted'],
             'declaration_info_correct' => ['accepted'],
             'declaration_agree_rules' => ['accepted'],
-            'profile_photo' => ['required', 'image', 'mimes:jpg,jpeg,png', "max:{$imageKb}"],
-            'face_capture' => ['required', 'image', 'mimes:jpg,jpeg,png', "max:{$imageKb}"],
+            'profile_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png', "max:{$imageKb}"],
         ];
     }
 

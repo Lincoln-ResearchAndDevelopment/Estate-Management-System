@@ -22,6 +22,9 @@ const schema = z.object({
   bank_name: z.string().trim().max(80),
   account_name: z.string().trim().max(120),
   account_number: z.union([z.literal(""), z.string().regex(/^\d{10}$/, "Enter the 10-digit NUBAN account number.")]),
+  gate_latitude: z.union([z.literal(""), z.string().regex(/^-?\d{1,2}(\.\d+)?$/, "e.g. 9.0579")]),
+  gate_longitude: z.union([z.literal(""), z.string().regex(/^-?\d{1,3}(\.\d+)?$/, "e.g. 7.4951")]),
+  gate_directions: z.string().trim().max(500),
 });
 type Values = z.infer<typeof schema>;
 type Settings = Record<keyof Values, string | null>;
@@ -33,7 +36,7 @@ export default function SettingsPage() {
   const s = data?.data;
   const form = useForm<Values>({
     resolver: zodResolver(schema),
-    values: s ? (Object.fromEntries(Object.keys(schema.shape).map((k) => [k, s[k as keyof Values] ?? ""])) as Values) : undefined,
+    values: s ? (Object.fromEntries(Object.keys(schema.shape).map((k) => [k, String(s[k as keyof Values] ?? "")])) as Values) : undefined,
   });
 
   const save = form.handleSubmit(async (v) => {
@@ -69,6 +72,15 @@ export default function SettingsPage() {
               <Field label="Bank name" htmlFor="s-bank" error={err.bank_name?.message}><Input id="s-bank" {...form.register("bank_name")} /></Field>
               <Field label="Account name" htmlFor="s-acname" error={err.account_name?.message}><Input id="s-acname" {...form.register("account_name")} /></Field>
               <Field label="Account number" htmlFor="s-acno" error={err.account_number?.message}><Input id="s-acno" inputMode="numeric" maxLength={10} {...form.register("account_number")} /></Field>
+            </div>
+            <div className="space-y-4 border-t border-line p-5">
+              <p className="text-sm font-semibold">Main gate location</p>
+              <p className="text-xs text-ink-600">Used on the resident Direction page (Get Directions, Share Gate Pin). In Google Maps, long-press the gate and copy the two numbers.</p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Latitude" htmlFor="s-lat" error={err.gate_latitude?.message}><Input id="s-lat" inputMode="decimal" {...form.register("gate_latitude")} /></Field>
+                <Field label="Longitude" htmlFor="s-lng" error={err.gate_longitude?.message}><Input id="s-lng" inputMode="decimal" {...form.register("gate_longitude")} /></Field>
+              </div>
+              <Field label="Directions to the gate" htmlFor="s-gdir" error={err.gate_directions?.message}><Textarea id="s-gdir" rows={2} placeholder="e.g. Second left after the filling station; main gate faces the expressway" {...form.register("gate_directions")} /></Field>
             </div>
             <div className="flex justify-end border-t border-line p-4"><Button type="submit" loading={form.formState.isSubmitting}>Save settings</Button></div>
           </Card>

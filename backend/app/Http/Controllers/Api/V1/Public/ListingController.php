@@ -129,7 +129,12 @@ class ListingController extends Controller
             'contact' => (function () {
                 $s = \App\Http\Controllers\Api\V1\Admin\SettingsController::all();
 
-                return ['address' => $s['estate_address'] ?? null, 'phone' => $s['estate_phone'] ?? null, 'email' => $s['estate_email'] ?? null, 'officeHours' => $s['office_hours'] ?? null, 'about' => $s['about'] ?? null];
+                return ['address' => $s['estate_address'] ?? null, 'phone' => $s['estate_phone'] ?? null, 'email' => $s['estate_email'] ?? null, 'officeHours' => $s['office_hours'] ?? null, 'about' => $s['about'] ?? null,
+                    'gate' => [
+                        'lat' => isset($s['gate_latitude']) ? (float) $s['gate_latitude'] : null,
+                        'lng' => isset($s['gate_longitude']) ? (float) $s['gate_longitude'] : null,
+                        'directions' => $s['gate_directions'] ?? null,
+                    ]];
             })(),
             'stats' => [
                 'liveListings' => PropertyListing::query()->publiclyVisible()->count(),

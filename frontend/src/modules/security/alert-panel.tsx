@@ -10,7 +10,14 @@ import { Select, Textarea } from "@/components/ui/form";
 import { Modal } from "@/components/ui/modal";
 import { StatusPill } from "@/components/ui/status-pill";
 import { useState } from "react";
+import { useAuth } from "@/modules/auth/auth-provider";
 import type { Alert } from "@/types/modules";
+
+/** Only the security team acts on alerts; management watches (enforced by the API too). */
+export function useIsSecurityTeam() {
+  const { session } = useAuth();
+  return !!session?.user.roles?.some((r) => r.code === "security_officer");
+}
 
 const NEXT: Record<string, { to: string; label: string; needsNote?: boolean; variant?: "primary" | "outline" | "danger" }[]> = {
   raised: [{ to: "acknowledged", label: "Acknowledge" }, { to: "false_alarm", label: "False alarm", needsNote: true, variant: "outline" }],
@@ -21,6 +28,7 @@ const NEXT: Record<string, { to: string; label: string; needsNote?: boolean; var
 /** Alert detail with the allowed next steps (SRS M08 alert lifecycle). */
 export function AlertModal({ alertId, onClose, onChanged }: { alertId: number; onClose: () => void; onChanged: () => void }) {
   const { busy, run } = useAction();
+  const isSecurityTeam = useIsSecurityTeam();
   const [note, setNote] = useState("");
   const [responder, setResponder] = useState("");
   const { data, refetch } = useQuery({ queryKey: ["security", "alert", alertId], queryFn: () => api.get<{ data: Alert }>(`/security/alerts/${alertId}`), refetchInterval: 10_000 });
@@ -58,7 +66,10 @@ export function AlertModal({ alertId, onClose, onChanged }: { alertId: number; o
           <ol className="border-l-2 border-army-100 pl-4">
             {a.events.map((e, i) => <li key={i} className="py-1"><span className="text-xs text-ink-600">{formatDateTime(e.occurredAt)}</span> — {titleCase(e.to)}{e.actor ? ` by ${e.actor}` : ""}{e.note ? `: ${e.note}` : ""}</li>)}
           </ol>
-          {NEXT[a.status] && (
+          {NEXT[a.status] && !isSecurityTeam && (
+            <p className="rounded-lg bg-canvas p-3 text-sm text-ink-600">The security team is handling this alert. Only security officers can acknowledge, dispatch and resolve alerts.</p>
+          )}
+          {NEXT[a.status] && isSecurityTeam && (
             <div className="space-y-3 border-t border-line pt-4">
               {a.status === "acknowledged" && (
                 <Select value={responder} onChange={(e) => setResponder(e.target.value)} aria-label="Responder">

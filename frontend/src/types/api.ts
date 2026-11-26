@@ -153,8 +153,8 @@ export interface AccessRequest {
   unit?: { id: number; code: string; street: string | null };
   nationalIdMasked: string;
   declarations: { insideEstate: boolean; infoCorrect: boolean; agreeRules: boolean };
-  photoUrl: string;
-  faceUrl: string;
+  /** Optional profile picture; null when the applicant did not supply one. */
+  photoUrl: string | null;
   status: "pending" | "info_requested" | "approved" | "rejected" | "expired";
   decisionReason: string | null;
   reviewedBy?: string | null;

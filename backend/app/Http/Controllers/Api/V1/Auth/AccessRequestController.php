@@ -15,7 +15,6 @@ class AccessRequestController extends Controller
         $accessRequest = $service->submit(
             $request->validated(),
             $request->file('profile_photo'),
-            $request->file('face_capture'),
         );
 
         return response()->json([

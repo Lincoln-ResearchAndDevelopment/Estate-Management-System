@@ -40,7 +40,7 @@ function Result() {
 export default function VerifyPaymentPage() {
   return (
     <>
-      <PageHeader title="Payment status" breadcrumbs={[{ label: "Bills & payments", href: "/resident/finance" }, { label: "Status" }]} />
+      <PageHeader title="Payment status" breadcrumbs={[{ label: "Finance", href: "/resident/finance" }, { label: "Status" }]} />
       <Suspense><Result /></Suspense>
     </>
   );

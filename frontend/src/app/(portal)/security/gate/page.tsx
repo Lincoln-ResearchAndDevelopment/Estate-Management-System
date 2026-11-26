@@ -1,21 +1,31 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useCallback, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertOctagon, CheckCircle2, DoorOpen, LogIn, LogOut, Plane, Search, XCircle } from "lucide-react";
+import { AlertOctagon, CheckCircle2, DoorOpen, LogIn, LogOut, Plane, ScanLine, Search, UserCheck, XCircle } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
-import { formatDate, formatDateTime, titleCase } from "@/lib/format";
+import { formatDate, formatDateTime, formatNaira, titleCase } from "@/lib/format";
 import { useAction } from "@/hooks/use-action";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Field, Input, Select } from "@/components/ui/form";
+import { Modal } from "@/components/ui/modal";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/states";
 import { StatusPill } from "@/components/ui/status-pill";
 import { useToast } from "@/components/ui/toast";
+import { QrScanner } from "@/modules/access/qr-scanner";
+import type { Money } from "@/types/api";
 import type { AwayNotice, BlacklistEntry, VisitorPass } from "@/types/modules";
 
-interface Verification { valid: boolean; reason: string | null; pass: VisitorPass; watchlist: BlacklistEntry | null }
+interface VisitorCheck { kind: "visitor"; valid: boolean; reason: string | null; pass: VisitorPass; watchlist: BlacklistEntry | null }
+interface ResidentCheck {
+  kind: "resident";
+  valid: true;
+  resident: { name: string; relationship: string | null; phone: string | null; householdId: number; unit: string | null; street: string | null };
+  cleared: boolean;
+  outstanding: Money;
+}
 
 const blankManual = { direction: "in", subject_type: "visitor", person_name: "", phone: "", plate_number: "", note: "" };
 
@@ -24,7 +34,9 @@ export default function GatePage() {
   const toast = useToast();
   const { busy, run } = useAction();
   const [code, setCode] = useState("");
-  const [result, setResult] = useState<Verification | null>(null);
+  const [result, setResult] = useState<VisitorCheck | null>(null);
+  const [resident, setResident] = useState<ResidentCheck | null>(null);
+  const [scanOpen, setScanOpen] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [manual, setManual] = useState(blankManual);
   const [manualError, setManualError] = useState<string | null>(null);
@@ -32,16 +44,34 @@ export default function GatePage() {
   const inside = useQuery({ queryKey: ["security", "inside"], queryFn: () => api.get<{ data: VisitorPass[] }>("/security/inside"), refetchInterval: 30_000 });
   const away = useQuery({ queryKey: ["security", "away"], queryFn: () => api.get<{ data: AwayNotice[] }>("/security/away"), refetchInterval: 120_000 });
 
-  const verify = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!code.trim()) return;
+  /** Checks a typed code or a scanned QR (visitor pass or resident estate pass). */
+  const check = useCallback(async (value: string) => {
+    if (!value.trim()) return;
     setLookupError(null);
     setResult(null);
+    setResident(null);
     try {
-      setResult((await api.post<{ data: Verification }>("/security/passes/verify", { code: code.trim() })).data);
+      const res = (await api.post<{ data: VisitorCheck | ResidentCheck }>("/security/passes/verify", { code: value.trim() })).data;
+      if (res.kind === "resident") setResident(res);
+      else setResult(res);
     } catch (err) {
       setLookupError(err instanceof ApiError ? err.message : "The code could not be checked.");
     }
+  }, []);
+
+  const verify = (e: FormEvent) => {
+    e.preventDefault();
+    check(code);
+  };
+
+  const onScan = useCallback((text: string) => {
+    setScanOpen(false);
+    check(text);
+  }, [check]);
+
+  const recordResident = async (r: ResidentCheck, direction: "in" | "out") => {
+    const res = await run(`r-${direction}`, () => api.post("/security/access-logs", { direction, subject_type: "resident", person_name: r.resident.name, household_id: r.resident.householdId }), direction === "in" ? "Resident entry recorded." : "Resident exit recorded.");
+    if (res !== undefined) setResident(null);
   };
 
   const recordPass = async (passCode: string, direction: "in" | "out") => {
@@ -79,14 +109,34 @@ export default function GatePage() {
   return (
     <>
       <PageHeader title="Gate control" description="Every entry is screened against the estate blacklist and watchlist." breadcrumbs={[{ label: "Security", href: "/security" }, { label: "Gate control" }]} />
+      <Modal open={scanOpen} onClose={() => setScanOpen(false)} title="Scan QR code">
+        {scanOpen && <QrScanner onResult={onScan} />}
+      </Modal>
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
-          <CardHeader title="Verify a visitor code" />
+          <CardHeader title="Scan a pass" description="Visitor QR passes and resident estate passes." />
           <div className="p-5">
+            <Button size="lg" className="mb-4 w-full" onClick={() => setScanOpen(true)}><ScanLine className="h-5 w-5" /> Scan QR code</Button>
+            <p className="mb-2 text-xs text-ink-600">Or type the visitor&apos;s 6-character backup code:</p>
             <form onSubmit={verify} className="flex gap-2">
               <Input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} maxLength={12} placeholder="e.g. 7KXQ2M" className="font-mono text-lg tracking-widest" aria-label="Visitor code" autoFocus />
               <Button type="submit"><Search className="h-4 w-4" /> Check</Button>
             </form>
+            {resident && (
+              <div className={`mt-4 rounded-xl border p-4 ${resident.cleared ? "border-success-600/40 bg-success-50" : "border-warning-600/40 bg-warning-50"}`}>
+                <p className="flex items-center gap-2 font-semibold text-ink-900"><UserCheck className="h-5 w-5 text-army-800" /> Resident · {resident.resident.name}</p>
+                <p className="mt-1 text-sm text-ink-600">Unit {resident.resident.unit ?? "—"}{resident.resident.street ? `, ${resident.resident.street}` : ""}{resident.resident.relationship ? ` · ${titleCase(resident.resident.relationship)}` : ""}</p>
+                {resident.cleared ? (
+                  <p className="mt-3 flex items-center gap-2 font-semibold text-success-600"><CheckCircle2 className="h-5 w-5" /> Cleared — estate dues paid</p>
+                ) : (
+                  <p className="mt-3 flex items-center gap-2 font-semibold text-warning-600"><AlertOctagon className="h-5 w-5" /> Not cleared — {formatNaira(resident.outstanding.amount)} outstanding</p>
+                )}
+                <div className="mt-4 flex gap-2">
+                  <Button loading={busy === "r-in"} onClick={() => recordResident(resident, "in")}><LogIn className="h-4 w-4" /> Record entry</Button>
+                  <Button variant="outline" loading={busy === "r-out"} onClick={() => recordResident(resident, "out")}><LogOut className="h-4 w-4" /> Record exit</Button>
+                </div>
+              </div>
+            )}
             {lookupError && <p role="alert" className="mt-3 flex items-center gap-2 text-sm text-danger-600"><XCircle className="h-4 w-4" />{lookupError}</p>}
             {result && (
               <div className={`mt-4 rounded-xl border p-4 ${result.valid ? "border-success-600/40 bg-success-50" : "border-danger-600/40 bg-danger-50"}`}>

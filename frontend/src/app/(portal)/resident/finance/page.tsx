@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Banknote, CreditCard, FlaskConical, Printer, Receipt as ReceiptIcon, Wallet } from "lucide-react";
+import { Banknote, CalendarCheck, CreditCard, FlaskConical, Printer, Receipt as ReceiptIcon, Wallet } from "lucide-react";
 import { api, ApiError, toFormData, type Paginated } from "@/lib/api";
 import { formatDate, formatDateTime, formatNaira, titleCase } from "@/lib/format";
 import { useAction } from "@/hooks/use-action";
@@ -31,17 +31,42 @@ interface Summary {
 
 const OPEN = ["unpaid", "part_paid", "overdue"];
 
+interface MonthsData {
+  monthlyCharges: { name: string; amount: Money }[];
+  monthlyTotal: Money;
+  months: { period: string; label: string; status: "paid" | "unpaid" | "part_paid" | "overdue" | "not_billed"; amount: Money; balance: Money; billIds: number[] }[];
+}
+
 /** M05 resident finance: bills, online payment, bank-transfer proof and receipts. */
 export default function ResidentFinancePage() {
   const toast = useToast();
   const { busy, run } = useAction();
-  const [tab, setTab] = useState("bills");
+  const [tab, setTab] = useState("months");
+  const [months, setMonths] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<number[]>([]);
-  const [transferOpen, setTransferOpen] = useState(false);
+  const [transfer, setTransfer] = useState<{ billIds: number[]; amount: number } | null>(null);
   const [receiptId, setReceiptId] = useState<number | null>(null);
 
   const summary = useQuery({ queryKey: ["resident", "finance"], queryFn: () => api.get<{ data: Summary }>("/resident/finance") });
+  const monthly = useQuery({
+    queryKey: ["resident", "months"],
+    queryFn: () => api.get<{ data: MonthsData }>("/resident/months"),
+    enabled: tab === "months",
+  });
+  const payableMonths = (monthly.data?.data.months ?? []).filter((m) => m.status !== "paid");
+  const monthsTotal = payableMonths.filter((m) => months.includes(m.period)).reduce((sum, m) => sum + Number(m.balance.amount), 0);
+  const toggleMonth = (period: string) => setMonths((cur) => (cur.includes(period) ? cur.filter((x) => x !== period) : [...cur, period]));
+
+  /** Turns the chosen months into bills (raising upcoming months on demand), then pays them. */
+  const payMonths = async (how: "online" | "transfer") => {
+    const prepared = await run(`m-${how}`, () => api.post<{ data: { billIds: number[]; total: { amount: string } } }>("/resident/bills/months", { periods: [...months].sort() }));
+    if (!prepared) return;
+    if (how === "transfer") return setTransfer({ billIds: prepared.data.billIds, amount: Number(prepared.data.total.amount) });
+    const res = await run("pay", () => api.post<{ data: { authorizationUrl: string } }>("/resident/payments/initialize", { bill_ids: prepared.data.billIds }));
+    if (res) window.location.assign(res.data.authorizationUrl);
+  };
+
   const payments = useQuery({
     queryKey: ["resident", "payments", page],
     queryFn: () => api.get<Paginated<Payment>>("/resident/payments", { page, pageSize: 10 }),
@@ -86,7 +111,7 @@ export default function ResidentFinancePage() {
 
   return (
     <>
-      <PageHeader title="Bills & payments" breadcrumbs={[{ label: "Home", href: "/resident" }, { label: "Bills & payments" }]} />
+      <PageHeader title="Finance" description="Your bills, monthly charges and payments." breadcrumbs={[{ label: "Dashboard", href: "/resident" }, { label: "Finance" }]} />
       {s?.testMode && (
         <div className="mb-6 flex items-start gap-3 rounded-lg border border-warning-600/30 bg-warning-50 p-4 text-sm text-warning-600">
           <FlaskConical className="mt-0.5 h-5 w-5 shrink-0" />
@@ -99,16 +124,53 @@ export default function ResidentFinancePage() {
         <KpiCard label={`Paid in ${new Date().getFullYear()}`} value={formatNaira(s?.paidThisYear.amount)} icon={<ReceiptIcon className="h-5 w-5" />} loading={summary.isLoading} />
       </div>
 
-      <Tabs className="mb-4" value={tab} onChange={setTab} items={[{ value: "bills", label: "Bills", count: openBills.length }, { value: "payments", label: "Payment history" }]} />
+      <Tabs className="mb-4" value={tab} onChange={setTab} items={[{ value: "months", label: "Pay by month" }, { value: "bills", label: "Bills", count: openBills.length }, { value: "payments", label: "Payment history" }]} />
 
-      {tab === "bills" ? (
+      {tab === "months" ? (
+        <Card>
+          <div className="flex flex-col gap-3 border-b border-line p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-sm text-ink-600">
+              <p>Monthly charge: <strong className="text-ink-900">{formatNaira(monthly.data?.data.monthlyTotal.amount, { decimals: true })}</strong>{monthly.data?.data.monthlyCharges.length ? ` (${monthly.data.data.monthlyCharges.map((c) => `${c.name} ${formatNaira(c.amount.amount)}`).join(" + ")})` : ""}</p>
+              <p>{months.length ? <>Selected <strong className="text-ink-900">{months.length}</strong> month(s) · <strong className="text-ink-900">{formatNaira(monthsTotal, { decimals: true })}</strong></> : "Tick the months you want to pay. You can pay ahead for up to 12 months."}</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" disabled={!months.length} loading={busy === "m-transfer"} onClick={() => payMonths("transfer")}><Banknote className="h-4 w-4" /> I paid by transfer</Button>
+              <Button disabled={!months.length} loading={busy === "m-online" || busy === "pay"} onClick={() => payMonths("online")}><CreditCard className="h-4 w-4" /> Pay online</Button>
+            </div>
+          </div>
+          {monthly.isLoading ? <div className="p-5 text-sm text-ink-600">Loading months…</div> : monthly.error ? <div className="p-5 text-sm text-danger-600">{(monthly.error as Error).message}</div> : !monthly.data?.data.monthlyCharges.length ? (
+            <div className="flex flex-col items-center gap-2 p-10 text-center text-sm text-ink-600"><CalendarCheck className="h-6 w-6" />The estate has not set a monthly charge yet.</div>
+          ) : (
+            <ul className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
+              {monthly.data.data.months.map((m) => {
+                const paid = m.status === "paid";
+                const checked = months.includes(m.period);
+                return (
+                  <li key={m.period}>
+                    <label className={`flex cursor-pointer items-center justify-between gap-3 rounded-lg border p-4 ${paid ? "cursor-default border-success-600/30 bg-success-50" : checked ? "border-army-800 bg-army-50" : "border-line hover:bg-canvas"}`}>
+                      <span className="flex items-center gap-3">
+                        <input type="checkbox" className="h-4 w-4 accent-army-800" disabled={paid} checked={paid || checked} onChange={() => toggleMonth(m.period)} aria-label={`Pay for ${m.label}`} />
+                        <span>
+                          <span className="block font-medium">{m.label}</span>
+                          <span className="block text-xs text-ink-600">{paid ? "Paid" : formatNaira(m.balance.amount, { decimals: true })}</span>
+                        </span>
+                      </span>
+                      <StatusPill status={m.status} label={m.status === "not_billed" ? "Not yet billed" : undefined} tone={m.status === "not_billed" ? "neutral" : undefined} />
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Card>
+      ) : tab === "bills" ? (
         <Card>
           <div className="flex flex-col gap-3 border-b border-line p-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-ink-600">
               {selected.length ? <>Selected <strong className="text-ink-900">{selected.length}</strong> bill(s) · <strong className="text-ink-900">{formatNaira(selectedTotal, { decimals: true })}</strong></> : "Select the bills you want to pay."}
             </p>
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" disabled={!selected.length} onClick={() => setTransferOpen(true)}><Banknote className="h-4 w-4" /> I paid by transfer</Button>
+              <Button variant="outline" disabled={!selected.length} onClick={() => setTransfer({ billIds: selected, amount: selectedTotal })}><Banknote className="h-4 w-4" /> I paid by transfer</Button>
               <Button disabled={!selected.length} loading={busy === "pay"} onClick={payOnline}><CreditCard className="h-4 w-4" /> Pay online</Button>
             </div>
           </div>
@@ -121,16 +183,18 @@ export default function ResidentFinancePage() {
         </Card>
       )}
 
-      {transferOpen && (
+      {transfer && (
         <TransferModal
           bankDetails={s?.bankDetails ?? null}
-          billIds={selected}
-          amount={selectedTotal}
-          onClose={() => setTransferOpen(false)}
+          billIds={transfer.billIds}
+          amount={transfer.amount}
+          onClose={() => setTransfer(null)}
           onDone={() => {
-            toast.success("Transfer submitted. Finance will verify it and send your receipt.");
-            setTransferOpen(false);
+            toast.success("Transfer submitted. Finance will verify it, then your bills are marked paid and your estate pass shows Cleared.");
+            setTransfer(null);
             setSelected([]);
+            setMonths([]);
+            monthly.refetch();
             summary.refetch();
             setTab("payments");
           }}

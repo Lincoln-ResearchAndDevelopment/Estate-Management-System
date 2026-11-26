@@ -45,6 +45,7 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
         // Street names for listing forms and public filters (not sensitive).
         Route::get('streets', [EstateController::class, 'streets']);
         Route::get('receipts/{number}', [PaystackWebhookController::class, 'verifyReceipt'])->middleware('throttle:public-forms');
+        Route::get('passes/{token}', [AccessController::class, 'publicPass'])->middleware('throttle:30,1');
     });
 
     // ---------------------------------------------------------------- auth
@@ -115,6 +116,9 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
             Route::get('dashboard', [ResidentController::class, 'dashboard'])->middleware('permission:finance.pay_own|household.manage_own|comms.use');
             Route::get('profile', [ResidentController::class, 'profile'])->middleware('permission:finance.pay_own|household.manage_own');
             Route::patch('profile', [ResidentController::class, 'updateProfile'])->middleware('permission:finance.pay_own|household.manage_own');
+            Route::get('pass', [ResidentController::class, 'pass'])->middleware('permission:access.manage_own|finance.pay_own');
+            Route::get('months', [ResidentController::class, 'months'])->middleware('permission:finance.pay_own');
+            Route::post('bills/months', [ResidentFinanceController::class, 'billMonths'])->middleware('permission:finance.pay_own');
             Route::middleware('permission:household.manage_own')->group(function () {
                 Route::post('household/members', [ResidentController::class, 'addMember']);
                 Route::delete('household/members/{member}', [ResidentController::class, 'removeMember']);
@@ -138,6 +142,9 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
                 Route::post('alerts', [SecurityController::class, 'raise'])->middleware('throttle:10,1');
                 Route::get('alerts', [SecurityController::class, 'myAlerts']);
                 Route::post('alerts/{alert}/cancel', [SecurityController::class, 'cancel']);
+                // Figma "Report": non-urgent security concerns sent to the security team.
+                Route::get('reports', [SecurityController::class, 'myReports']);
+                Route::post('reports', [SecurityController::class, 'storeResidentReport'])->middleware('throttle:10,1');
             });
 
             // M09 visitor passes, activity and away notices
@@ -179,13 +186,14 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
 
         // ------------------------------------------------------------ M08 security console, M09 gate, M10 blacklist
         Route::prefix('security')->group(function () {
-            Route::middleware('permission:security.respond')->group(function () {
+            Route::middleware('permission:security.respond|security.view')->group(function () {
                 Route::get('overview', [SecurityController::class, 'overview']);
                 Route::get('alerts', [SecurityController::class, 'alerts']);
                 Route::get('alerts/{alert}', [SecurityController::class, 'showAlert']);
-                Route::post('alerts/{alert}/transition', [SecurityController::class, 'transitionAlert']);
                 Route::get('officers', [SecurityController::class, 'officers']);
             });
+            // Only the security team acts on alerts (also enforced in AlertService).
+            Route::post('alerts/{alert}/transition', [SecurityController::class, 'transitionAlert'])->middleware('permission:security.respond');
             Route::middleware('permission:security.reports')->group(function () {
                 Route::get('incidents', [SecurityController::class, 'incidents']);
                 Route::post('incidents', [SecurityController::class, 'storeIncident']);

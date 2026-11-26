@@ -109,7 +109,7 @@ export default function HouseholdPage() {
 
   return (
     <>
-      <PageHeader title="My household" breadcrumbs={[{ label: "Home", href: "/resident" }, { label: "My household" }]} />
+      <PageHeader title="My household" breadcrumbs={[{ label: "Dashboard", href: "/resident" }, { label: "My household" }]} />
       {isLoading || !p ? (
         <div className="grid gap-6 lg:grid-cols-2"><Skeleton className="h-64" /><Skeleton className="h-64" /></div>
       ) : (

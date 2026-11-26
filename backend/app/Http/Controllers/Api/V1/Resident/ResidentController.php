@@ -13,6 +13,10 @@ use App\Models\Resident;
 use App\Models\Vehicle;
 use App\Models\VisitorPass;
 use App\Services\AuditLogger;
+use App\Services\Finance\BillingService;
+use App\Services\Finance\ClearanceService;
+use App\Services\Security\AccessService;
+use App\Support\QrPayload;
 use App\Support\Present;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -23,7 +27,88 @@ use Illuminate\Validation\Rule;
  */
 class ResidentController extends Controller
 {
-    public function __construct(private readonly AuditLogger $audit) {}
+    public function __construct(
+        private readonly AuditLogger $audit,
+        private readonly AccessService $access,
+        private readonly ClearanceService $clearance,
+        private readonly BillingService $billing,
+    ) {}
+
+    /**
+     * GET /resident/pass — the resident's own estate pass (QR) and whether their dues are cleared.
+     * Clearance updates as soon as finance confirms a payment.
+     */
+    public function pass(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $resident = Resident::query()->with('household.unit.street')->where('user_id', $user->id)->where('status', 'active')->first();
+        if (! $resident) {
+            throw new BusinessRuleException('Your account is not linked to a household yet.', 'NO_HOUSEHOLD', 404);
+        }
+        $status = $this->clearance->status($resident->household);
+
+        return response()->json(['data' => [
+            'name' => $resident->full_name,
+            'relationship' => $resident->relationship,
+            'unit' => $resident->household?->unit?->unit_code,
+            'street' => $resident->household?->unit?->street?->name,
+            'estate' => config('estate.name'),
+            'qrPayload' => QrPayload::resident($this->access->residentToken($resident)),
+            'cleared' => $status['cleared'],
+            'outstanding' => Present::money($status['outstanding']),
+            'dueBills' => $status['dueBills'],
+            'checkedAt' => now()->toIso8601String(),
+        ]]);
+    }
+
+    /**
+     * GET /resident/months — this month, overdue months and the next 11 months for the household's
+     * monthly charges, with what is paid, billed or not yet billed, so the resident can pick months to pay.
+     */
+    public function months(Request $request): JsonResponse
+    {
+        $household = $this->household($request);
+        $services = $this->billing->monthlyServicesFor($household);
+        $monthly = (float) $services->sum('amount');
+
+        $bills = Bill::query()->where('household_id', $household->id)->whereIn('service_id', $services->pluck('id'))
+            ->whereNotNull('period_label')->where('status', '!=', 'void')->get()->groupBy('period_label');
+
+        $start = now()->startOfMonth();
+        $periods = collect(range(0, 11))->map(fn ($i) => $start->copy()->addMonths($i)->format('Y-m'));
+        // Earlier months that are still owed are listed first.
+        $owedEarlier = $bills->keys()->filter(fn ($p) => $p < $start->format('Y-m')
+            && $bills[$p]->contains(fn (Bill $b) => in_array($b->status, Bill::OPEN, true)))->sort()->values();
+
+        $rows = $owedEarlier->merge($periods)->unique()->map(function (string $period) use ($bills, $monthly) {
+            $group = $bills->get($period, collect());
+            $billed = (float) $group->sum('amount');
+            $paid = (float) $group->sum('amount_paid');
+            $open = $group->filter(fn (Bill $b) => in_array($b->status, Bill::OPEN, true));
+            $status = match (true) {
+                $group->isEmpty() => 'not_billed',
+                $open->isEmpty() => 'paid',
+                $open->contains('status', 'overdue') => 'overdue',
+                $paid > 0 => 'part_paid',
+                default => 'unpaid',
+            };
+
+            return [
+                'period' => $period,
+                'label' => \Illuminate\Support\Carbon::createFromFormat('Y-m-d', $period.'-01')->format('F Y'),
+                'status' => $status,
+                'amount' => Present::money($group->isEmpty() ? $monthly : $billed),
+                'balance' => Present::money($group->isEmpty() ? $monthly : max(0, $billed - $paid)),
+                'billIds' => $open->pluck('id')->values(),
+            ];
+        })->values();
+
+        return response()->json(['data' => [
+            'monthlyCharges' => $services->map(fn ($s) => ['name' => $s->name, 'amount' => Present::money($s->amount)])->values(),
+            'monthlyTotal' => Present::money($monthly),
+            'months' => $rows,
+        ]]);
+    }
 
     public function dashboard(Request $request): JsonResponse
     {
@@ -32,8 +117,14 @@ class ResidentController extends Controller
 
         $openBills = $household ? Bill::query()->where('household_id', $household->id)->whereIn('status', Bill::OPEN)->orderBy('due_date')->get() : collect();
 
+        $monthly = $household ? $this->billing->monthlyServicesFor($household) : collect();
+
         return response()->json(['data' => [
             'unit' => $household?->unit?->unit_code,
+            // Set by the finance team per service; changes apply to bills raised from then on.
+            'monthlyCharges' => $monthly->map(fn ($s) => ['name' => $s->name, 'amount' => Present::money($s->amount)])->values(),
+            'monthlyTotal' => Present::money((float) $monthly->sum('amount')),
+            'cleared' => $household ? $this->clearance->status($household)['cleared'] : null,
             'balance' => Present::money($openBills->sum(fn (Bill $b) => $b->balance())),
             'overdueCount' => $openBills->where('status', 'overdue')->count(),
             'nextBill' => $openBills->first() ? Present::bill($openBills->first()) : null,
@@ -147,6 +238,16 @@ class ResidentController extends Controller
         $household = $request->user()->household();
         if (! $household || $household->head_user_id !== $request->user()->id) {
             throw new BusinessRuleException('Only the head of household can manage members and vehicles.', 'FORBIDDEN', 403);
+        }
+
+        return $household;
+    }
+
+    private function household(Request $request): Household
+    {
+        $household = $request->user()->household();
+        if (! $household) {
+            throw new BusinessRuleException('Your account is not linked to a household yet.', 'NO_HOUSEHOLD', 404);
         }
 
         return $household;

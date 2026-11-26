@@ -64,7 +64,7 @@ export default function EmergencyPage() {
 
   return (
     <>
-      <PageHeader title="Emergency" description="Use this only for real emergencies. Security responds to every alert and false alarms are recorded." breadcrumbs={[{ label: "Home", href: "/resident" }, { label: "Emergency" }]} />
+      <PageHeader title="Emergency" description="Use this only for real emergencies. Security responds to every alert and false alarms are recorded." breadcrumbs={[{ label: "Dashboard", href: "/resident" }, { label: "Emergency" }]} />
 
       {active ? (
         <Card className="mb-6 border-danger-600/40">
