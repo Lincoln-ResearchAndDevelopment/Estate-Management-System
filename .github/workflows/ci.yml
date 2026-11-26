@@ -53,6 +53,20 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: http://localhost:8000
 
+  devcontainer:
+    name: Codespaces dev container builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and start the dev container (same config Codespaces uses)
+        run: npx -y @devcontainers/cli@latest up --workspace-folder . --skip-post-create
+      - name: Docker and Compose work inside it
+        run: |
+          npx -y @devcontainers/cli@latest exec --workspace-folder . docker version
+          npx -y @devcontainers/cli@latest exec --workspace-folder . docker compose version
+          npx -y @devcontainers/cli@latest exec --workspace-folder . bash scripts/setup-env.sh
+          npx -y @devcontainers/cli@latest exec --workspace-folder . docker compose config --quiet
+
   e2e:
     name: End-to-end (Docker stack + Playwright)
     runs-on: ubuntu-latest
