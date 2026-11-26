@@ -16,11 +16,11 @@ class Bill extends Model
         return round((float) $this->amount - (float) $this->amount_paid, 2);
     }
 
-    protected $fillable = ['reference', 'household_id', 'service_id', 'description', 'period_label', 'amount', 'amount_paid', 'due_date', 'status', 'created_by'];
+    protected $fillable = ['reference', 'household_id', 'service_id', 'description', 'period_label', 'period_start', 'amount', 'amount_paid', 'due_date', 'status', 'created_by'];
 
     protected function casts(): array
     {
-        return ['amount' => 'decimal:2', 'amount_paid' => 'decimal:2', 'due_date' => 'date'];
+        return ['amount' => 'decimal:2', 'amount_paid' => 'decimal:2', 'due_date' => 'date', 'period_start' => 'date'];
     }
 
     public function household(): BelongsTo

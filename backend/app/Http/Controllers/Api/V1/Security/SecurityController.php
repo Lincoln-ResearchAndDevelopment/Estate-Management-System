@@ -16,6 +16,7 @@ use App\Services\Security\AlertService;
 use App\Support\ApiResponse;
 use App\Support\Present;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Arr;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -145,6 +146,52 @@ class SecurityController extends Controller
                 'closedThisMonth' => IncidentReport::where('status', 'closed')->where('closed_at', '>=', now()->startOfMonth())->count(),
             ],
         ]);
+    }
+
+    /** GET /resident/reports — reports this resident has sent to security, with their progress. */
+    public function myReports(Request $request): JsonResponse
+    {
+        $page = IncidentReport::query()->with(['reporter', 'notes.user'])->where('reported_by', $request->user()->id)
+            ->latest()->paginate(ApiResponse::pageSize($request));
+
+        // Residents see status and the security team's replies, not internal assignment details.
+        return ApiResponse::paginateMap($page, fn ($r) => Arr::except(Present::incident($r), ['assignedTo']));
+    }
+
+    /**
+     * POST /resident/reports — a resident reports a security concern (Figma "Report"). It lands in the
+     * security team's incident list and every on-duty officer is notified. For danger now, use PANIC.
+     */
+    public function storeResidentReport(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'title' => ['required', 'string', 'min:5', 'max:150'],
+            'category' => ['required', Rule::in(IncidentReport::CATEGORIES)],
+            'location' => ['nullable', 'string', 'max:150'],
+            'description' => ['required', 'string', 'min:10', 'max:5000'],
+        ]);
+        $user = $request->user();
+        $unit = $user->household()?->unit?->unit_code;
+
+        $report = IncidentReport::create($data + [
+            'reference' => $this->codes->next('incident_reports', 'reference', 'IR', 5),
+            'severity' => 'medium',
+            'location' => $data['location'] ?? ($unit ? "Unit {$unit}" : null),
+            'reported_by' => $user->id,
+            'status' => 'open',
+        ]);
+        $this->audit->log('incident.reported_by_resident', $report, after: $data);
+
+        $officers = \App\Models\User::query()->where('status', 'active')
+            ->whereHas('roles', fn ($q) => $q->where('code', 'security_officer'))->get();
+        \Illuminate\Support\Facades\Notification::send($officers, new \App\Notifications\GenericNotification(
+            'Resident report: '.$report->title,
+            $user->name.($unit ? " (Unit {$unit})" : '').' reported '.str_replace('_', ' ', $report->category).'.',
+            '/security/incidents',
+            'security',
+        ));
+
+        return response()->json(['data' => Arr::except(Present::incident($report->load(['reporter', 'notes'])), ['assignedTo'])], 201);
     }
 
     public function storeIncident(Request $request): JsonResponse

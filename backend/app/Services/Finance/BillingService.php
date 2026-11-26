@@ -32,6 +32,67 @@ class BillingService
         };
     }
 
+    /** First day of the period a bill covers (null for one-off charges). */
+    public static function periodStart(Service $service, CarbonInterface $date): ?CarbonInterface
+    {
+        return match ($service->frequency) {
+            'monthly' => $date->copy()->startOfMonth(),
+            'quarterly' => $date->copy()->startOfQuarter(),
+            'yearly' => $date->copy()->startOfYear(),
+            default => null,
+        };
+    }
+
+    /** Active monthly services that apply to a household (what the resident pays each month). */
+    public function monthlyServicesFor(Household $household): Collection
+    {
+        return Service::query()->where('is_active', true)->where('frequency', 'monthly')
+            ->where(fn ($q) => $q->where('applies_to', 'all')
+                ->orWhereHas('households', fn ($h) => $h->where('households.id', $household->id)))
+            ->orderBy('name')->get();
+    }
+
+    /**
+     * Ensures the household has a bill for each monthly service for each chosen month ("Y-m"), so a
+     * resident can pay month by month, including up to 12 months ahead. Returns the open bills for those months.
+     *
+     * @param  list<string>  $periods
+     */
+    public function billMonths(Household $household, array $periods, ?User $actor = null): Collection
+    {
+        $latest = now()->startOfMonth()->addMonths(12);
+        $services = $this->monthlyServicesFor($household);
+        $bills = collect();
+
+        foreach (array_unique($periods) as $period) {
+            if (! preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $period)) {
+                throw \App\Exceptions\BusinessRuleException::invalidState("{$period} is not a valid month.");
+            }
+            $month = \Illuminate\Support\Carbon::createFromFormat('Y-m-d', $period.'-01')->startOfDay();
+            if ($month->greaterThan($latest)) {
+                throw \App\Exceptions\BusinessRuleException::invalidState('You can pay at most 12 months ahead.');
+            }
+            foreach ($services as $service) {
+                $existing = Bill::query()->where('household_id', $household->id)->where('service_id', $service->id)
+                    ->where('period_label', $period)->first();
+                if ($existing) {
+                    if (in_array($existing->status, Bill::OPEN, true)) {
+                        $bills->push($existing);
+                    }
+
+                    continue;
+                }
+                // Only months that have not started yet may be created here; past months come from the billing run.
+                if ($month->lessThan(now()->startOfMonth())) {
+                    continue;
+                }
+                $bills->push($this->billHousehold($service, $household, $month, $actor, notify: false));
+            }
+        }
+
+        return $bills->unique('id')->values();
+    }
+
     /** Households a service applies to. */
     public function householdsFor(Service $service): Collection
     {
@@ -69,24 +130,40 @@ class BillingService
             if ($exists) {
                 continue;
             }
-
-            $bill = DB::transaction(fn () => Bill::create([
-                'reference' => $this->codes->next('bills', 'reference', 'B', 5),
-                'household_id' => $household->id,
-                'service_id' => $service->id,
-                'description' => $service->name.($period ? " ({$period})" : ''),
-                'period_label' => $period,
-                'amount' => $service->amount,
-                'due_date' => $date->copy()->startOfDay()->addDays($service->due_days)->toDateString(),
-                'status' => 'unpaid',
-                'created_by' => $actor?->id,
-            ]));
+            $this->billHousehold($service, $household, $date, $actor);
             $created++;
-
-            $this->notifyHousehold($household, 'New bill: '.$bill->description, '₦'.number_format((float) $bill->amount, 2).' due '.$bill->due_date->format('M j, Y'), '/resident/finance');
         }
 
         return $created;
+    }
+
+    /** Creates one household's bill for the period containing $date (callers check for duplicates). */
+    public function billHousehold(Service $service, Household $household, CarbonInterface $date, ?User $actor = null, bool $notify = true): Bill
+    {
+        $period = self::periodLabel($service, $date);
+        $start = self::periodStart($service, $date);
+        // Due a set number of days after the period starts (or after today, for a period already under way).
+        $base = $start && $start->greaterThan(now()) ? $start->copy() : now()->startOfDay();
+        $label = $start && $service->frequency === 'monthly' ? $start->format('M Y') : $period;
+
+        $bill = DB::transaction(fn () => Bill::create([
+            'reference' => $this->codes->next('bills', 'reference', 'B', 5),
+            'household_id' => $household->id,
+            'service_id' => $service->id,
+            'description' => $service->name.($label ? " ({$label})" : ''),
+            'period_label' => $period,
+            'period_start' => $start?->toDateString(),
+            'amount' => $service->amount,
+            'due_date' => $base->addDays($service->due_days)->toDateString(),
+            'status' => 'unpaid',
+            'created_by' => $actor?->id,
+        ]));
+
+        if ($notify) {
+            $this->notifyHousehold($household, 'New bill: '.$bill->description, '₦'.number_format((float) $bill->amount, 2).' due '.$bill->due_date->format('M j, Y'), '/resident/finance');
+        }
+
+        return $bill;
     }
 
     /**

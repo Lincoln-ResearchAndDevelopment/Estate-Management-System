@@ -6,10 +6,13 @@ use App\Exceptions\BusinessRuleException;
 use App\Models\AccessLog;
 use App\Models\BlacklistEntry;
 use App\Models\Household;
+use App\Models\Resident;
 use App\Models\User;
 use App\Models\VisitorPass;
 use App\Notifications\GenericNotification;
 use App\Services\AuditLogger;
+use App\Services\Finance\ClearanceService;
+use App\Support\QrPayload;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
@@ -19,7 +22,7 @@ use Illuminate\Support\Str;
  */
 class AccessService
 {
-    public function __construct(private readonly AuditLogger $audit) {}
+    public function __construct(private readonly AuditLogger $audit, private readonly ClearanceService $clearance) {}
 
     public function createPass(User $user, Household $household, array $data): VisitorPass
     {
@@ -29,6 +32,7 @@ class AccessService
 
         $pass = VisitorPass::create([
             'code' => $code,
+            'qr_token' => $this->uniqueToken(VisitorPass::class, 'qr_token'),
             'household_id' => $household->id,
             'created_by' => $user->id,
             'visitor_name' => $data['visitor_name'],
@@ -43,6 +47,42 @@ class AccessService
         $this->audit->log('pass.created', $pass, after: ['visitor' => $pass->visitor_name], actor: $user);
 
         return $pass;
+    }
+
+    /** The resident's personal estate pass token (created on first use). */
+    public function residentToken(Resident $resident): string
+    {
+        if (! $resident->pass_token) {
+            $resident->forceFill(['pass_token' => $this->uniqueToken(Resident::class, 'pass_token')])->save();
+        }
+
+        return $resident->pass_token;
+    }
+
+    /**
+     * What the gate sees when a resident's estate pass is scanned: who they are, their unit, and whether
+     * their dues are cleared.
+     *
+     * @return array{resident: Resident, clearance: array{cleared: bool, outstanding: float, dueBills: int}}
+     */
+    public function verifyResident(string $token): array
+    {
+        $resident = Resident::query()->with(['household.unit.street', 'user'])->where('pass_token', $token)->first();
+        if (! $resident || $resident->status !== 'active' || ($resident->user && ! $resident->user->isActive())) {
+            throw new BusinessRuleException('This estate pass is not valid. The resident may have moved out or been deactivated.', 'PASS_NOT_FOUND', 404);
+        }
+
+        return ['resident' => $resident, 'clearance' => $this->clearance->status($resident->household)];
+    }
+
+    /** @param class-string<\Illuminate\Database\Eloquent\Model> $model */
+    private function uniqueToken(string $model, string $column): string
+    {
+        do {
+            $token = Str::random(40);
+        } while ($model::query()->where($column, $token)->exists());
+
+        return $token;
     }
 
     public function cancelPass(VisitorPass $pass, User $user): VisitorPass
@@ -83,7 +123,12 @@ class AccessService
      */
     public function verifyCode(string $code): array
     {
-        $pass = VisitorPass::query()->with('household.unit', 'creator')->where('code', strtoupper(trim($code)))->first();
+        $parsed = QrPayload::parse($code);
+        if ($parsed['type'] === 'resident') {
+            throw new BusinessRuleException('This is a resident estate pass, not a visitor pass.', 'NOT_A_VISITOR_PASS', 422);
+        }
+        $column = $parsed['type'] === 'visitor' ? 'qr_token' : 'code';
+        $pass = VisitorPass::query()->with('household.unit', 'creator')->where($column, $parsed['value'])->first();
         if (! $pass) {
             throw new BusinessRuleException('No pass found with this code.', 'PASS_NOT_FOUND', 404);
         }

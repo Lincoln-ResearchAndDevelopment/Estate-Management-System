@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class VisitorPass extends Model
 {
-    protected $fillable = ['code', 'household_id', 'created_by', 'visitor_name', 'visitor_phone', 'purpose', 'vehicle_plate', 'valid_from', 'valid_until', 'max_entries', 'entries_used', 'status'];
+    protected $fillable = ['code', 'qr_token', 'household_id', 'created_by', 'visitor_name', 'visitor_phone', 'purpose', 'vehicle_plate', 'valid_from', 'valid_until', 'max_entries', 'entries_used', 'status'];
 
     protected function casts(): array
     {

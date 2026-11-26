@@ -76,6 +76,10 @@ class AlertService
         if ($to === 'cancelled' && $alert->raised_by !== $actor->id) {
             throw new BusinessRuleException('Only the person who raised the alert can cancel it.', 'FORBIDDEN', 403);
         }
+        // Responding to and resolving an emergency is the security team's job, not management's.
+        if ($to !== 'cancelled' && ! $actor->hasRole('security_officer')) {
+            throw new BusinessRuleException('Only the estate security team can respond to and resolve emergency alerts.', 'FORBIDDEN', 403);
+        }
         if (in_array($to, ['resolved', 'false_alarm'], true) && ! $note) {
             throw new BusinessRuleException('Add a resolution note.', 'VALIDATION_FAILED');
         }

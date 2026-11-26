@@ -37,8 +37,19 @@ class AccessRequestTest extends TestCase
             'declaration_info_correct' => '1',
             'declaration_agree_rules' => '1',
             'profile_photo' => UploadedFile::fake()->image('me.jpg'),
-            'face_capture' => UploadedFile::fake()->image('face.jpg'),
         ], $overrides), ['Accept' => 'application/json']);
+    }
+
+    public function test_profile_picture_is_optional_and_no_face_photo_is_required(): void
+    {
+        $this->submit(['profile_photo' => null])->assertCreated();
+        $request = AccessRequest::firstOrFail();
+        $this->assertNull($request->profile_photo_path);
+
+        $this->signIn('estate_manager');
+        $this->getJson("/api/v1/admin/access-requests/{$request->id}")->assertOk()->assertJsonPath('data.photoUrl', null);
+        $this->get("/api/v1/admin/access-requests/{$request->id}/files/photo")->assertNotFound();
+        $this->get("/api/v1/admin/access-requests/{$request->id}/files/face")->assertNotFound();
     }
 
     public function test_applicant_submits_and_estate_manager_approves(): void
@@ -79,7 +90,7 @@ class AccessRequestTest extends TestCase
             'relationship' => 'primary_resident', 'unit_id' => Unit::first()->id, 'national_id' => '12345678901',
             'password' => 'Resident#2026', 'password_confirmation' => 'Resident#2026',
             'declaration_inside_estate' => '1', 'declaration_info_correct' => '1', 'declaration_agree_rules' => '1',
-            'profile_photo' => UploadedFile::fake()->image('me.jpg'), 'face_capture' => UploadedFile::fake()->image('face.jpg'),
+            'profile_photo' => UploadedFile::fake()->image('me.jpg'),
         ], ['Accept' => 'application/json'])->assertStatus(409)->assertJsonPath('code', 'DUPLICATE');
     }
 

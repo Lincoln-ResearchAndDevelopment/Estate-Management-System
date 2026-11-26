@@ -138,6 +138,9 @@ class Present
             'status' => $p->status === 'active' && $p->valid_until?->isPast() ? 'expired' : $p->status,
             'unit' => $p->relationLoaded('household') ? $p->household?->unit?->unit_code : null,
             'host' => $p->relationLoaded('creator') ? $p->creator?->name : null,
+            // QR code content and a link the resident can send to the visitor (opens the QR on their phone).
+            'qrPayload' => $p->qr_token ? QrPayload::visitor($p->qr_token) : null,
+            'shareUrl' => $p->qr_token ? config('estate.frontend_url').'/pass/'.$p->qr_token : null,
             'createdAt' => $p->created_at?->toIso8601String(),
         ];
     }

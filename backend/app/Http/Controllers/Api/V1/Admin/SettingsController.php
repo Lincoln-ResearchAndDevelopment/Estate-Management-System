@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\DB;
  */
 class SettingsController extends Controller
 {
-    public const KEYS = ['estate_address', 'estate_phone', 'estate_email', 'office_hours', 'about', 'bank_name', 'account_name', 'account_number'];
+    public const KEYS = ['estate_address', 'estate_phone', 'estate_email', 'office_hours', 'about', 'bank_name', 'account_name', 'account_number', 'gate_latitude', 'gate_longitude', 'gate_directions'];
 
     /** Current settings merged over defaults; cached for the public site. */
     public static function all(): array
@@ -53,6 +53,10 @@ class SettingsController extends Controller
             'bank_name' => ['nullable', 'string', 'max:80'],
             'account_name' => ['nullable', 'string', 'max:120'],
             'account_number' => ['nullable', 'regex:/^\d{10}$/'],
+            // Main gate location for the resident "Direction" page (Share Gate Pin / Get Directions).
+            'gate_latitude' => ['nullable', 'numeric', 'between:-90,90', 'required_with:gate_longitude'],
+            'gate_longitude' => ['nullable', 'numeric', 'between:-180,180', 'required_with:gate_latitude'],
+            'gate_directions' => ['nullable', 'string', 'max:500'],
         ], ['account_number.regex' => 'Enter the 10-digit NUBAN account number.']);
 
         $before = self::all();

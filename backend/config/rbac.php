@@ -57,7 +57,8 @@ return [
         'finance.pay_own' => 'View and pay own household bills',
         // M08 security & emergency
         'alerts.raise' => 'Raise panic / emergency alerts',
-        'security.respond' => 'Acknowledge, dispatch and resolve emergency alerts',
+        'security.respond' => 'Acknowledge, dispatch and resolve emergency alerts (security team only)',
+        'security.view' => 'View the security console and emergency alerts (read-only)',
         'security.reports' => 'Create and manage intelligence / incident reports',
         // M09 access control and M10 blacklist
         'access.manage_own' => 'Create visitor passes and away notices for own household',
@@ -87,7 +88,7 @@ return [
             'access_requests.view', 'access_requests.decide', 'agents.view', 'agents.decide',
             'estate.view', 'estate.manage', 'listings.review', 'listings.create', 'listings.edit_any',
             'listings.delete_any', 'listings.approve', 'listings.feature', 'audit.view', 'settings.manage',
-            'residents.view', 'finance.view', 'security.respond', 'security.reports', 'access.view',
+            'residents.view', 'finance.view', 'security.view', 'security.reports', 'access.view',
             'blacklist.view', 'blacklist.manage', 'staff.view', 'staff.manage', 'comms.use', 'comms.publish',
             'comms.moderate', 'stores.approve', 'reports.view',
         ],
