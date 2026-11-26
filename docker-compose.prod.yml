@@ -1,0 +1,24 @@
+# Production overlay: HTTPS via Caddy (automatic Let's Encrypt) on your own domain.
+#   DOMAIN=estate.example.ng ./scripts/setup-env.sh --production
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# Point the domain's DNS A record at the server first. Set real SMTP and Paystack keys in .env.
+
+services:
+  web:
+    ports: !reset []
+  mailpit:
+    profiles: ["dev"]
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    command: ["caddy", "reverse-proxy", "--from", "${DOMAIN:?set DOMAIN in .env}", "--to", "web:3000"]
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy-data:/data
+    depends_on:
+      - web
+
+volumes:
+  caddy-data:

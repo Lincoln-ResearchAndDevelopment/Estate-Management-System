@@ -2,98 +2,142 @@
 
 namespace App\Http\Controllers\Api\V1\Auth;
 
+use App\Exceptions\BusinessRuleException;
 use App\Http\Controllers\Controller;
-use App\Models\User;
+use App\Http\Requests\Auth\ChangePasswordRequest;
+use App\Http\Requests\Auth\LoginRequest;
+use App\Http\Resources\SessionResource;
+use App\Services\AuditLogger;
+use App\Services\Auth\AuthService;
+use App\Services\Auth\TotpService;
+use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Password;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
-/**
- * KAN-14 / KAN-15: login by email, set-password link for admin-created accounts.
- */
 class AuthController extends Controller
 {
-    public function login(Request $request): JsonResponse
+    public function __construct(private readonly AuthService $auth) {}
+
+    /** POST /auth/login — Sanctum SPA cookie session. Call GET /sanctum/csrf-cookie first. */
+    public function login(LoginRequest $request): SessionResource|JsonResponse
     {
-        $data = $request->validate([
-            'email' => ['required', 'email'],
-            'password' => ['required', 'string'],
-        ]);
+        $remember = (bool) $request->validated('remember', false);
+        $user = $this->auth->login($request, $request->validated('email'), $request->validated('password'), $remember);
 
-        $user = User::where('email', $data['email'])->first();
-
-        if (! $user || ! Hash::check($data['password'], $user->password)) {
-            throw ValidationException::withMessages(['email' => ['These credentials do not match our records.']]);
-        }
-        if ($user->status !== 'active') {
-            throw ValidationException::withMessages(['email' => ["This account is {$user->status}. Contact the estate admin."]]);
+        if ($user->mfaEnabled()) {
+            // Password correct; the second factor is still needed (FR-AUTH-12).
+            return response()->json(['data' => ['mfaRequired' => true, 'challenge' => $this->auth->mfaChallenge($user, $remember)]]);
         }
 
-        $user->forceFill(['last_active_at' => now()])->save();
-
-        return response()->json([
-            'status' => 'success',
-            'data' => [
-                'token' => $user->createToken('web')->plainTextToken,
-                'user' => $this->present($user),
-            ],
-        ]);
+        return new SessionResource($user);
     }
 
-    public function me(Request $request): JsonResponse
+    /** POST /auth/mfa/challenge — completes sign-in with an authenticator or recovery code. */
+    public function mfaChallenge(Request $request, TotpService $totp, AuditLogger $audit): SessionResource
     {
-        return response()->json(['status' => 'success', 'data' => $this->present($request->user())]);
+        $data = $request->validate(['challenge' => ['required', 'string'], 'code' => ['required', 'string', 'max:20']]);
+        [$user, $remember] = $this->auth->resolveChallenge($data['challenge']);
+
+        $code = strtoupper(trim($data['code']));
+        $recovery = (array) $user->mfa_recovery_codes;
+        $valid = $totp->verify((string) $user->mfa_secret, $code);
+
+        if (! $valid && in_array($code, $recovery, true)) {
+            $valid = true;
+            $user->forceFill(['mfa_recovery_codes' => array_values(array_diff($recovery, [$code]))])->save();
+            $audit->log('auth.mfa_recovery_used', $user, actor: $user);
+        }
+
+        if (! $valid) {
+            $audit->log('auth.mfa_failed', $user, actor: $user);
+            throw ValidationException::withMessages(['code' => 'That code is not valid. Check your authenticator app and try again.']);
+        }
+
+        return new SessionResource($this->auth->completeLogin($request, $user, $remember));
+    }
+
+    /** POST /auth/mfa/setup — creates a new (not yet active) secret for the authenticator app. */
+    public function mfaSetup(Request $request, TotpService $totp): JsonResponse
+    {
+        $user = $request->user();
+        if ($user->mfaEnabled()) {
+            throw new BusinessRuleException('Two-factor sign-in is already on.', 'INVALID_STATE', 409);
+        }
+
+        $secret = $totp->generateSecret();
+        $user->forceFill(['mfa_secret' => $secret])->save();
+
+        return response()->json(['data' => [
+            'secret' => trim(chunk_split($secret, 4, ' ')),
+            'otpauthUrl' => $totp->otpauthUrl($secret, $user->email, config('estate.short_name')),
+        ]]);
+    }
+
+    /** POST /auth/mfa/enable — confirms the first code, turns MFA on and returns one-time recovery codes. */
+    public function mfaEnable(Request $request, TotpService $totp, AuditLogger $audit): JsonResponse
+    {
+        $code = $request->validate(['code' => ['required', 'string', 'max:10']])['code'];
+        $user = $request->user();
+
+        if (! $user->mfa_secret || ! $totp->verify((string) $user->mfa_secret, $code)) {
+            throw ValidationException::withMessages(['code' => 'That code is not valid. Check the time on your phone and try again.']);
+        }
+
+        $codes = $totp->recoveryCodes();
+        $user->forceFill(['mfa_enabled_at' => now(), 'mfa_recovery_codes' => $codes])->save();
+        $audit->log('auth.mfa_enabled', $user);
+
+        return response()->json(['data' => ['recoveryCodes' => $codes]]);
+    }
+
+    public function mfaDisable(Request $request, AuditLogger $audit): JsonResponse
+    {
+        $password = $request->validate(['password' => ['required', 'string']])['password'];
+        $user = $request->user();
+
+        if ($user->mfaRequired()) {
+            throw new BusinessRuleException('Two-factor sign-in is required for your role and cannot be turned off.', 'FORBIDDEN', 403);
+        }
+        if (! Hash::check($password, $user->password)) {
+            throw ValidationException::withMessages(['password' => 'The password is incorrect.']);
+        }
+
+        $user->forceFill(['mfa_enabled_at' => null, 'mfa_secret' => null, 'mfa_recovery_codes' => null])->save();
+        $audit->log('auth.mfa_disabled', $user);
+
+        return ApiResponse::message('Two-factor sign-in turned off.');
+    }
+
+    /** GET /auth/session — current user, roles, permissions and portal. */
+    public function session(Request $request): SessionResource
+    {
+        return new SessionResource($request->user());
     }
 
     public function logout(Request $request): JsonResponse
     {
-        $request->user()->currentAccessToken()?->delete();
+        $this->auth->logout($request);
 
-        return response()->json(['status' => 'success', 'message' => 'Logged out']);
+        return ApiResponse::message('Signed out.');
     }
 
-    /** Sends (or re-sends) the set/reset password link. Always answers 200 so emails cannot be probed. */
-    public function sendSetPasswordLink(Request $request): JsonResponse
+    public function changePassword(ChangePasswordRequest $request, AuditLogger $audit): JsonResponse
     {
-        $data = $request->validate(['email' => ['required', 'email']]);
-        Password::sendResetLink($data);
+        $user = $request->user();
 
-        return response()->json(['status' => 'success', 'message' => 'If the email exists, a link has been sent.']);
-    }
-
-    public function setPassword(Request $request): JsonResponse
-    {
-        $data = $request->validate([
-            'email' => ['required', 'email'],
-            'token' => ['required', 'string'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
-        ]);
-
-        $result = Password::reset($data, function (User $user, string $password) {
-            $user->forceFill(['password' => Hash::make($password), 'remember_token' => Str::random(60)])->save();
-            $user->tokens()->delete();
-        });
-
-        if ($result !== Password::PASSWORD_RESET) {
-            throw ValidationException::withMessages(['email' => [__($result)]]);
+        if (! Hash::check($request->validated('current_password'), $user->password)) {
+            throw ValidationException::withMessages(['current_password' => 'The current password is incorrect.']);
         }
 
-        return response()->json(['status' => 'success', 'message' => 'Password saved. You can now log in.']);
-    }
+        $user->forceFill([
+            'password' => $request->validated('password'),
+            'must_change_password' => false,
+        ])->save();
 
-    private function present(User $user): array
-    {
-        return [
-            'id' => $user->id,
-            'name' => $user->name,
-            'email' => $user->email,
-            'role' => $user->role,
-            'roles' => $user->getRoleNames(),
-            'status' => $user->status,
-            'avatar_url' => $user->avatar_url,
-        ];
+        $audit->log('auth.password_changed', $user);
+
+        return ApiResponse::message('Password changed.');
     }
 }

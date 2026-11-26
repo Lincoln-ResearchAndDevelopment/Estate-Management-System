@@ -1,0 +1,8 @@
+node_modules
+.next
+.env
+.env.*
+!.env.example
+coverage
+e2e/test-results
+e2e/playwright-report

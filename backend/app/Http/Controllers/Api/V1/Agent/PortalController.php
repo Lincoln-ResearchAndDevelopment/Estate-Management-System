@@ -2,142 +2,133 @@
 
 namespace App\Http\Controllers\Api\V1\Agent;
 
+use App\Enums\ListingStatus;
 use App\Http\Controllers\Controller;
-use App\Models\ClientRequest;
-use App\Models\CommissionPayout;
-use App\Models\Listing;
-use App\Models\Viewing;
+use App\Models\ListingEnquiry;
+use App\Models\ListingStatusHistory;
+use App\Models\PropertyListing;
+use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
-/**
- * The individual agent's portal: listings, client requests, viewings and earnings.
- * Response shapes match the front-end `agentPortal` types (money in naira).
- */
+/** Agent dashboard (SCR-LIST-04), enquiries (SCR-LIST-07) and profile. */
 class PortalController extends Controller
 {
-    public const COMMISSION_RATE = 0.10; // share of the first year's rent
-
-    private const AVAIL = ['available' => 'Available', 'under_offer' => 'Under Offer', 'rented' => 'Rented', 'sold' => 'Rented'];
-
-    public static function listingOut(Listing $l): array
+    public function dashboard(Request $request): JsonResponse
     {
-        return [
-            'id' => (string) $l->id, 'title' => $l->title, 'type' => $l->property_type, 'zone' => $l->zone, 'address' => $l->address,
-            'beds' => (int) $l->beds, 'baths' => (int) $l->baths, 'rentPerYear' => $l->price_kobo / 100,
-            'status' => self::AVAIL[$l->availability] ?? 'Available', 'listedOn' => $l->created_at->toDateString(),
-            'views' => (int) $l->views, 'inquiries' => (int) $l->inquiries, 'approval' => $l->approval_status, 'listingType' => $l->listing_type,
-        ];
-    }
+        $agentId = $request->user()->id;
+        $counts = PropertyListing::query()->where('agent_user_id', $agentId)
+            ->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status');
+        $listingIds = PropertyListing::withTrashed()->where('agent_user_id', $agentId)->pluck('id');
 
-    private function requestOut(ClientRequest $r): array
-    {
-        return [
-            'id' => (string) $r->id, 'clientName' => $r->client_name, 'phone' => $r->phone, 'email' => $r->email ?? '',
-            'propertyType' => $r->property_type, 'minBeds' => (int) $r->min_beds, 'zone' => $r->zone,
-            'maxBudget' => $r->max_budget_kobo / 100, 'moveInBy' => $r->move_in_by?->toDateString() ?? '', 'note' => $r->note ?? '',
-            'status' => $r->status, 'receivedOn' => $r->created_at->toDateString(),
-        ];
-    }
+        $decisions = ListingStatusHistory::query()
+            ->whereIn('listing_id', $listingIds)
+            ->whereIn('to_status', ['approved', 'rejected', 'approval_withdrawn', 'deleted'])
+            ->where(fn ($q) => $q->whereNull('actor_user_id')->orWhere('actor_user_id', '!=', $agentId))
+            ->with('actor:id,name')->latest('occurred_at')->limit(5)->get()
+            ->map(fn ($h) => [
+                'listingId' => $h->listing_id,
+                'listingTitle' => PropertyListing::withTrashed()->whereKey($h->listing_id)->value('title'),
+                'decision' => $h->to_status,
+                'reason' => $h->reason,
+                'occurredAt' => $h->occurred_at?->toIso8601String(),
+            ]);
 
-    private function viewingOut(Viewing $v): array
-    {
-        return [
-            'id' => (string) $v->id, 'listingId' => (string) $v->listing_id, 'requestId' => $v->client_request_id ? (string) $v->client_request_id : null,
-            'clientName' => $v->client_name, 'date' => $v->scheduled_at->toDateString(), 'time' => $v->scheduled_at->format('H:i'), 'status' => $v->status,
-        ];
-    }
-
-    public function show(Request $r): JsonResponse
-    {
-        $uid = $r->user()->id;
-        $payouts = CommissionPayout::where('agent_id', $uid)->get();
-        $earnings = [];
-        for ($i = 5; $i >= 0; $i--) {
-            $m = now()->subMonths($i);
-            $earnings[] = ['month' => $m->format('M'), 'commission' => (int) round($payouts->filter(fn ($p) => $p->paid_at->isSameMonth($m))->sum('amount_kobo') / 100)];
-        }
+        $enquiries = ListingEnquiry::query()->whereIn('listing_id', $listingIds)->with('listing:id,title')
+            ->latest()->limit(5)->get();
 
         return response()->json(['data' => [
-            'agent' => ['name' => $r->user()->name, 'zone' => \App\Models\AgentProfile::where('user_id', $uid)->value('zone') ?? ''],
-            'listings' => Listing::where('agent_id', $uid)->latest()->get()->map(fn ($l) => self::listingOut($l))->values(),
-            'requests' => ClientRequest::where(fn ($q) => $q->where('agent_id', $uid)->orWhereNull('agent_id'))->latest()->limit(100)->get()->map(fn ($x) => $this->requestOut($x))->values(),
-            'viewings' => Viewing::where('agent_id', $uid)->orderBy('scheduled_at')->limit(200)->get()->map(fn ($v) => $this->viewingOut($v))->values(),
-            'earnings' => $earnings,
-            'paidListingIds' => $payouts->pluck('listing_id')->map(fn ($i) => (string) $i)->values(),
+            'kpis' => [
+                'live' => (int) ($counts[ListingStatus::Approved->value] ?? 0),
+                'pending' => (int) ($counts[ListingStatus::PendingApproval->value] ?? 0),
+                'rejectedOrWithdrawn' => (int) (($counts['rejected'] ?? 0) + ($counts['approval_withdrawn'] ?? 0)),
+                'drafts' => (int) ($counts['draft'] ?? 0),
+                'newEnquiries' => ListingEnquiry::whereIn('listing_id', $listingIds)->where('status', 'new')->count(),
+                'totalViews' => (int) PropertyListing::where('agent_user_id', $agentId)->sum('view_count'),
+            ],
+            'recentDecisions' => $decisions,
+            'latestEnquiries' => $enquiries->map(fn ($e) => $this->enquiry($e)),
         ]]);
     }
 
-    public function updateRequest(Request $r, int $id): JsonResponse
+    public function enquiries(Request $request): JsonResponse
     {
-        $d = $r->validate(['status' => ['required', Rule::in(ClientRequest::STATUSES)]]);
-        $req = ClientRequest::where(fn ($q) => $q->where('agent_id', $r->user()->id)->orWhereNull('agent_id'))->findOrFail($id);
-        $req->update(['status' => $d['status'], 'agent_id' => $req->agent_id ?? $r->user()->id]);
-
-        return response()->json(['data' => $this->requestOut($req)]);
-    }
-
-    public function bookViewing(Request $r): JsonResponse
-    {
-        $d = $r->validate([
-            'listing_id' => 'required|integer', 'client_request_id' => 'nullable|integer|exists:client_requests,id',
-            'client_name' => 'required|string|max:255', 'date' => 'required|date_format:Y-m-d', 'time' => 'required|date_format:H:i',
+        $filters = $request->validate([
+            'status' => ['nullable', Rule::in(ListingEnquiry::STATUSES)],
+            'listing_id' => ['nullable', 'integer'],
         ]);
-        $uid = $r->user()->id;
-        $listing = Listing::where('agent_id', $uid)->findOrFail($d['listing_id']);
-        $at = \Illuminate\Support\Carbon::parse($d['date'].' '.$d['time']);
 
-        if ($at->isPast()) {
-            return response()->json(['message' => 'That time has already passed. Pick a later time.'], 422);
-        }
-        if ($clash = Viewing::where('agent_id', $uid)->where('status', 'Scheduled')->where('scheduled_at', $at)->first()) {
-            return response()->json(['message' => "You already have a viewing with {$clash->client_name} at that time."], 422);
-        }
+        $listingIds = PropertyListing::withTrashed()->where('agent_user_id', $request->user()->id)->pluck('id');
 
-        $v = Viewing::create(['listing_id' => $listing->id, 'client_request_id' => $d['client_request_id'] ?? null, 'agent_id' => $uid,
-            'client_name' => $d['client_name'], 'scheduled_at' => $at]);
-        if (! empty($d['client_request_id'])) {
-            ClientRequest::whereKey($d['client_request_id'])->update(['status' => 'Viewing Booked', 'agent_id' => $uid]);
-        }
+        $page = ListingEnquiry::query()->whereIn('listing_id', $listingIds)->with('listing:id,title,slug')
+            ->when($filters['status'] ?? null, fn ($q, $v) => $q->where('status', $v))
+            ->when($filters['listing_id'] ?? null, fn ($q, $v) => $q->where('listing_id', $v))
+            ->latest()->paginate(ApiResponse::pageSize($request));
 
-        return response()->json(['data' => $this->viewingOut($v)], 201);
+        $page->setCollection($page->getCollection()->map(fn ($e) => $this->enquiry($e)));
+
+        return response()->json([
+            'data' => $page->items(),
+            'meta' => ['page' => $page->currentPage(), 'pageSize' => $page->perPage(), 'total' => $page->total(), 'totalPages' => $page->lastPage()],
+        ]);
     }
 
-    public function updateViewing(Request $r, int $id): JsonResponse
+    public function updateEnquiry(Request $request, int $id): JsonResponse
     {
-        $d = $r->validate(['status' => ['required', Rule::in(['Completed', 'Cancelled'])]]);
-        $v = Viewing::where('agent_id', $r->user()->id)->findOrFail($id);
-        $v->update(['status' => $d['status']]);
-        $this->settleRequest($v->client_request_id);
+        $listingIds = PropertyListing::withTrashed()->where('agent_user_id', $request->user()->id)->pluck('id');
+        $enquiry = ListingEnquiry::query()->whereIn('listing_id', $listingIds)->with('listing:id,title,slug')->findOrFail($id);
 
-        return response()->json(['data' => $this->viewingOut($v)]);
+        $enquiry->update($request->validate([
+            'status' => ['sometimes', Rule::in(ListingEnquiry::STATUSES)],
+            'agent_note' => ['sometimes', 'nullable', 'string', 'max:2000'],
+        ]));
+
+        return response()->json(['data' => $this->enquiry($enquiry)]);
     }
 
-    /** A request with no scheduled viewings left drops back from "Viewing Booked" to "Contacted". */
-    public static function settleRequest(?int $requestId): void
+    public function profile(Request $request): JsonResponse
     {
-        if (! $requestId) return;
-        $req = ClientRequest::find($requestId);
-        if ($req && $req->status === 'Viewing Booked' && ! Viewing::where('client_request_id', $requestId)->where('status', 'Scheduled')->exists()) {
-            $req->update(['status' => 'Contacted']);
-        }
+        $user = $request->user()->load('agentProfile');
+
+        return response()->json(['data' => [
+            'name' => $user->name,
+            'email' => $user->email,
+            'phone' => $user->phone,
+            'agencyName' => $user->agentProfile?->agency_name,
+            'agencyRegNo' => $user->agentProfile?->agency_reg_no,
+            'bio' => $user->agentProfile?->bio,
+            'status' => $user->agentProfile?->status,
+            'verified' => (bool) $user->agentProfile?->verified,
+        ]]);
     }
 
-    /** Called when a listing is marked rented/sold: pay commission once, cancel stale viewings. */
-    public static function onRented(Listing $l): ?int
+    public function updateProfile(Request $request): JsonResponse
     {
-        $stale = Viewing::where('listing_id', $l->id)->where('status', 'Scheduled')->get();
-        foreach ($stale as $v) {
-            $v->update(['status' => 'Cancelled']);
-            self::settleRequest($v->client_request_id);
-        }
-        if ($l->listing_type !== 'rent' || CommissionPayout::where('listing_id', $l->id)->exists()) {
-            return null;
-        }
-        $fee = (int) round($l->price_kobo * self::COMMISSION_RATE);
-        CommissionPayout::create(['agent_id' => $l->agent_id, 'listing_id' => $l->id, 'amount_kobo' => $fee, 'paid_at' => now()]);
+        $data = $request->validate([
+            'agency_name' => ['nullable', 'string', 'max:120'],
+            'agency_reg_no' => ['nullable', 'string', 'max:60'],
+            'bio' => ['nullable', 'string', 'max:1000'],
+        ]);
 
-        return $fee;
+        $request->user()->agentProfile()->update($data);
+
+        return $this->profile($request);
+    }
+
+    private function enquiry(ListingEnquiry $e): array
+    {
+        return [
+            'id' => $e->id,
+            'listing' => $e->listing ? ['id' => $e->listing->id, 'title' => $e->listing->title, 'slug' => $e->listing->slug] : null,
+            'name' => $e->name,
+            'phone' => $e->phone,
+            'email' => $e->email,
+            'message' => $e->message,
+            'preferredViewingDate' => $e->preferred_viewing_date?->toDateString(),
+            'status' => $e->status,
+            'agentNote' => $e->agent_note,
+            'createdAt' => $e->created_at?->toIso8601String(),
+        ];
     }
 }

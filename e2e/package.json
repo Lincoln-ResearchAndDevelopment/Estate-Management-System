@@ -1,0 +1,11 @@
+{
+  "name": "pahe-e2e",
+  "private": true,
+  "description": "End-to-end tests against the running Docker stack",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.50.0"
+  }
+}

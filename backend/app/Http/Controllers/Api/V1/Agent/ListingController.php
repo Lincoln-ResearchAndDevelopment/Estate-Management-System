@@ -2,98 +2,134 @@
 
 namespace App\Http\Controllers\Api\V1\Agent;
 
+use App\Enums\ListingStatus;
 use App\Http\Controllers\Controller;
-use App\Models\Listing;
+use App\Http\Requests\Listings\ListingRequest;
+use App\Http\Resources\OwnerListingResource;
+use App\Models\ListingMedia;
+use App\Models\PropertyListing;
+use App\Services\Listings\ListingService;
+use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 /**
- * KAN-63/64/65: an agent creates and manages their own listings.
- * Every create or edit of content puts the listing back to `pending` for admin review.
+ * Agent portal: own listings only. Listings of other agents return 404 (no existence leak).
  */
 class ListingController extends Controller
 {
+    public function __construct(private readonly ListingService $listings) {}
+
     public function index(Request $request): JsonResponse
     {
-        $q = Listing::where('agent_id', $request->user()->id)->latest();
-        if ($s = $request->query('approval_status')) {
-            $q->where('approval_status', $s);
-        }
-
-        return response()->json(['status' => 'success', 'data' => $q->get()]);
-    }
-
-    public function store(Request $request): JsonResponse
-    {
-        $data = $this->validated($request);
-        $listing = Listing::create($data + [
-            'agent_id' => $request->user()->id,
-            'price_kobo' => (int) round($request->input('price') * 100),
+        $filters = $request->validate([
+            'status' => ['nullable', Rule::in(array_map(fn ($s) => $s->value, ListingStatus::cases()))],
+            'q' => ['nullable', 'string', 'max:100'],
         ]);
 
-        return response()->json(['status' => 'success', 'message' => 'Submitted for admin approval', 'data' => $listing], 201);
-    }
+        $query = PropertyListing::query()->where('agent_user_id', $request->user()->id);
 
-    public function update(Request $request, int $id): JsonResponse
-    {
-        $listing = $this->own($request, $id);
-        $data = $this->validated($request, partial: true);
-        if ($request->has('price')) {
-            $data['price_kobo'] = (int) round($request->input('price') * 100);
+        if (($filters['status'] ?? null) === ListingStatus::Deleted->value) {
+            $query->onlyTrashed();
         }
-        $listing->fill($data);
-        // Content changed: needs a fresh review before it is public again.
-        $listing->approval_status = 'pending';
-        $listing->rejection_reason = null;
-        $listing->approved_at = null;
-        $listing->save();
 
-        return response()->json(['status' => 'success', 'message' => 'Updated, awaiting admin approval', 'data' => $listing]);
+        $listings = $query->with(['media', 'sector', 'street'])->withCount('enquiries')
+            ->filter($filters)->latest('updated_at')->paginate(ApiResponse::pageSize($request));
+
+        $counts = PropertyListing::query()->where('agent_user_id', $request->user()->id)
+            ->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status');
+
+        return ApiResponse::paginated($listings, OwnerListingResource::class, ['statusCounts' => $counts]);
     }
 
-    /** Mark rented / sold / under offer. Does not need re-approval. */
-    public function setAvailability(Request $request, int $id): JsonResponse
+    public function show(Request $request, int $id): OwnerListingResource
     {
-        $listing = $this->own($request, $id);
-        $listing->availability = $request->validate([
-            'availability' => ['required', Rule::in(Listing::AVAILABILITY)],
-        ])['availability'];
-        $listing->save();
-        $fee = in_array($listing->availability, ['rented', 'sold'], true) ? PortalController::onRented($listing) : null;
+        return new OwnerListingResource($this->own($request, $id)->load(['media', 'sector', 'street', 'unit', 'history.actor'])->loadCount('enquiries'));
+    }
 
-        return response()->json(['status' => 'success', 'data' => $listing, 'commission' => $fee ? $fee / 100 : null]);
+    public function store(ListingRequest $request): JsonResponse
+    {
+        $listing = $this->listings->create(
+            $request->user(),
+            $request->listingData(),
+            false,
+            $request->file('owner_authorisation'),
+        );
+
+        return (new OwnerListingResource($listing->load(['media', 'sector', 'street'])))->response()->setStatusCode(201);
+    }
+
+    public function update(ListingRequest $request, int $id): OwnerListingResource
+    {
+        $listing = $this->listings->update($this->own($request, $id), $request->user(), $request->listingData(), $request->file('owner_authorisation'));
+
+        if ($request->boolean('submit') && $listing->status->canSubmit()) {
+            $listing = $this->listings->submit($listing, $request->user());
+        }
+
+        return new OwnerListingResource($listing->load(['media', 'sector', 'street', 'history.actor']));
+    }
+
+    public function submit(Request $request, int $id): OwnerListingResource
+    {
+        $request->validate(['declaration' => ['accepted']], ['declaration.accepted' => 'Confirm that you are authorised to market this property.']);
+
+        return new OwnerListingResource($this->listings->submit($this->own($request, $id), $request->user())->load(['media', 'sector', 'street']));
+    }
+
+    public function markClosed(Request $request, int $id): OwnerListingResource
+    {
+        return new OwnerListingResource($this->listings->markClosed($this->own($request, $id), $request->user())->load(['media', 'sector', 'street']));
+    }
+
+    public function renew(Request $request, int $id): OwnerListingResource
+    {
+        return new OwnerListingResource($this->listings->renew($this->own($request, $id), $request->user())->load(['media', 'sector', 'street']));
     }
 
     public function destroy(Request $request, int $id): JsonResponse
     {
-        $this->own($request, $id)->delete();
+        $this->listings->delete($this->own($request, $id), $request->user(), null, byAdmin: false);
 
-        return response()->json(['status' => 'success', 'message' => 'Listing removed']);
+        return ApiResponse::message('Listing deleted.');
     }
 
-    private function own(Request $request, int $id): Listing
+    public function history(Request $request, int $id): JsonResponse
     {
-        return Listing::where('agent_id', $request->user()->id)->findOrFail($id);
+        $listing = $this->own($request, $id, withTrashed: true)->load('history.actor');
+
+        return response()->json(['data' => (new OwnerListingResource($listing))->resolve()['history'] ?? []]);
     }
 
-    private function validated(Request $request, bool $partial = false): array
+    public function uploadPhotos(Request $request, int $id): OwnerListingResource
     {
-        $req = $partial ? 'sometimes|required' : 'required';
-
-        return $request->validate([
-            'title' => "$req|string|min:5|max:150",
-            'description' => 'nullable|string|max:5000',
-            'listing_type' => [$partial ? 'sometimes' : 'required', Rule::in(Listing::TYPES)],
-            'property_type' => "$req|string|max:50",
-            'zone' => "$req|string|max:100",
-            'address' => "$req|string|min:5|max:255",
-            'beds' => 'nullable|integer|min:0|max:50',
-            'baths' => 'nullable|integer|min:0|max:50',
-            'price' => "$req|numeric|min:1",
-            'price_period' => 'nullable|in:per_year,per_month',
-            'photos' => 'nullable|array|max:10',
-            'photos.*' => 'string|max:500',
+        $kb = config('estate.uploads.image_max_kb');
+        $request->validate([
+            'photos' => ['required', 'array', 'min:1', 'max:'.config('estate.listings.max_photos')],
+            'photos.*' => ['image', 'mimes:jpg,jpeg,png,webp', "max:{$kb}"],
         ]);
+
+        return new OwnerListingResource($this->listings->addPhotos($this->own($request, $id), $request->user(), $request->file('photos'))->load(['sector', 'street']));
+    }
+
+    public function deletePhoto(Request $request, int $id, ListingMedia $media): OwnerListingResource
+    {
+        return new OwnerListingResource($this->listings->removePhoto($this->own($request, $id), $request->user(), $media)->load(['sector', 'street']));
+    }
+
+    public function reorderPhotos(Request $request, int $id): OwnerListingResource
+    {
+        $order = $request->validate(['order' => ['required', 'array', 'min:1'], 'order.*' => ['integer']])['order'];
+
+        return new OwnerListingResource($this->listings->reorderPhotos($this->own($request, $id), $request->user(), $order)->load(['sector', 'street']));
+    }
+
+    private function own(Request $request, int $id, bool $withTrashed = false): PropertyListing
+    {
+        return PropertyListing::query()
+            ->when($withTrashed, fn ($q) => $q->withTrashed())
+            ->where('agent_user_id', $request->user()->id)
+            ->findOrFail($id);
     }
 }

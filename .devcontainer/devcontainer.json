@@ -1,0 +1,25 @@
+{
+  "name": "PAHE Estate Management (live test)",
+  // Pinned to Ubuntu 22.04: the Docker-in-Docker feature cannot install Moby on the 24.04 image that
+  // "base:ubuntu" now points to, which drops the codespace into recovery mode.
+  "image": "mcr.microsoft.com/devcontainers/base:jammy",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:4": {
+      "version": "latest",
+      "moby": true,
+      "dockerDashComposeVersion": "v2",
+      // Choose the iptables backend when the container starts: current host kernels no longer provide the
+      // legacy "nat" table, and dockerd exits with "can't initialize iptables table `nat'" if forced onto it.
+      "iptablesSwitchAtRuntime": true
+    }
+  },
+  // A 2-core codespace has 8 GB RAM, enough for MySQL + the image builds. 4-core builds faster if offered.
+  "hostRequirements": { "cpus": 2, "memory": "8gb" },
+  "forwardPorts": [3000, 8025],
+  "portsAttributes": {
+    "3000": { "label": "PAHE web app", "onAutoForward": "openBrowser" },
+    "8025": { "label": "Test mailbox (Mailpit)", "onAutoForward": "silent" }
+  },
+  "postCreateCommand": "bash scripts/codespace-start.sh",
+  "postStartCommand": "bash scripts/codespace-start.sh"
+}

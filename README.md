@@ -1,38 +1,49 @@
-# Estate Management System (Army Estate Phase One)
+# Post Army Housing Estates (PAHE) Management System
 
-One repo, two apps:
+Estate management platform for Post Army Housing Estates, Abuja: a public landing page with approved property
+listings, and role-based portals for estate management, property agents and residents. One mobile-friendly
+website; no native apps.
 
-| Folder | Stack | Run |
-|---|---|---|
-| `backend/`  | Laravel 12, Sanctum, Spatie permissions, MySQL | `composer install && cp .env.example .env && php artisan key:generate && php artisan migrate --seed && php artisan serve` |
-| `frontend/` | Next.js 16, React 19, Tailwind 4 | `npm install && cp .env.local.example .env.local && npm run dev` |
+> **Status:** all SRS modules are built and wired end to end. CI runs the backend and frontend test suites and boots
+> the full Docker stack for Playwright end-to-end tests on every push. See [documentation/progress.md](documentation/progress.md)
+> for exactly what is verified and the known gaps.
 
-**Status: assembled, not yet built or run.** The workspace that merged this had no access to npm or Packagist, so
-`npm run build` and `composer install` have never been run on it. PHP files pass `php -l`; every `@/…` and relative
-import in the front end was checked to resolve to a real file. Expect a first round of build fixes (see MERGE_NOTES.md).
+## Test it live
 
-## Where each module lives
+**Fastest:** on GitHub choose **Code → Codespaces → Create codespace** on this branch. The stack builds and opens
+by itself (about 6–10 minutes the first time). Sign in with `resident.head@test.pahe.local`,
+`super.admin@test.pahe.local`, `security.officer@test.pahe.local` … password `Demo@Pahe2026`.
+Full account list and production deployment: [documentation/deployment-guide.md](documentation/deployment-guide.md).
 
-| Module | Front-end URL | Front-end code | API |
-|---|---|---|---|
-| Public landing page (approved listings) | `/`, `/listings/:id` | `app/(public)` | `/api/v1/public/listings` |
-| Sign in / set password | `/login`, `/set-password` | `app/(finance)/login`, `app/(public)/set-password` | `/api/v1/auth/*` |
-| Finance, payments, management, agents directory, agent portal | `/finance`, `/payments`, `/management`, `/agents`, `/agent-portal` … | `app/(finance)` | `routes/api/finance.php` |
-| Admin app | `/admin/*` | `app/(admin)/admin` | `routes/api/admin.php` |
-| Listing approval queue (admin) | `/admin/listings` | `app/(admin)/admin/listings` | `/api/v1/admin/listings` |
-| Security app | `/security/*` | `app/(security)/security` | none yet |
-| Store module | `/store-app/*` | `app/(store)/store-app` | `routes/api/store.php` |
+**With Docker anywhere:** `./scripts/setup-env.sh && docker compose up -d --build`, then open http://localhost:3000.
 
-Each module keeps its own root layout through a Next.js route group, so its CSS and shell do not leak into the others.
+| Folder | Stack |
+|---|---|
+| [`backend/`](backend) | Laravel 12 REST API, PHP 8.2+, MySQL 8, Sanctum (SPA cookie auth), Laravel Queues & Notifications, OpenAPI via Scramble |
+| [`frontend/`](frontend) | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4, TanStack Query, React Hook Form + Zod, Lucide icons |
+| [`documentation/`](documentation) | Architecture, API, database, installation, deployment, progress tracker |
+| [`legacy/`](legacy) | The previous merged implementation, kept for reference only. Not built or deployed. |
 
-## Roles
+## Local development without Docker
 
-`super_admin, admin, manager, security, resident, staff, agent, maintenance, store_owner`.
-The admin app writes `users.role`; an observer mirrors it into Spatie roles. Admin creates every account except residents
-(residents come from the Google Form import). Set `ESTATE_ENFORCE_AUTH=true` to require login and role on the finance,
-admin and store API groups (off by default because the existing screens do not send the token yet).
+See [documentation/installation-guide.md](documentation/installation-guide.md) (PHP 8.2+, Composer, MySQL 8, Node 22).
 
-## Agent listings flow
+## What is in this release
 
-Agent submits a listing (`/agent-portal`) → status `pending` → admin approves in `/admin/listings` → it appears on `/`.
-Editing a listing sends it back to `pending`. Marking rented or sold does not.
+- **Public site:** landing page and approved property listings with search, enquiries and receipt verification.
+- **Residents:** dashboard, household members and vehicles, bills and online/transfer payments with receipts,
+  visitor passes with gate codes, away notices, panic button, marketplace orders, notices, meetings, feed, messages.
+- **Estate administration:** access requests, households, users, estate directory, listing and agent approvals,
+  store approvals, staff, reports with CSV exports, settings, audit log.
+- **Finance:** service charges with automatic monthly/quarterly/yearly billing, manual bills, Paystack (or test
+  checkout), bank-transfer verification, offline payments, outstanding balances, charts.
+- **Security:** live HQ dashboard, alert response workflow with escalation, gate control with blacklist/watchlist
+  screening, access logs, incident reports.
+- **Agents and store owners:** their own portals for listings/enquiries and store/products/orders.
+- **Platform:** 9 roles with permissions enforced on every API route, TOTP two-factor sign-in (mandatory for admins
+  and finance in production), in-app + e-mail notifications, rate limits, security headers, audit log.
+
+## Branching
+
+`main` (production, owner merges only) ← `develop` (integration) ← `feature/<module>` branches. See
+[legacy/BRANCHING_STRATEGY.md](legacy/BRANCHING_STRATEGY.md); the rules still apply.

@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, develop]
+
+jobs:
+  backend:
+    name: Backend (Laravel)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: mbstring, pdo_sqlite, pdo_mysql, intl, gd
+          coverage: none
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Prepare environment
+        run: cp .env.example .env && php artisan key:generate
+      - name: Code style (report only until the first pint pass is committed)
+        run: vendor/bin/pint --test
+        continue-on-error: true
+      - name: Tests
+        run: php artisan test --display-warnings --display-deprecations
+
+  frontend:
+    name: Frontend (Next.js)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Lint
+        run: npm run lint
+      - name: Type check
+        run: npm run typecheck
+      - name: Unit and component tests
+        run: npm test
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:8000
+
+  devcontainer:
+    name: Codespaces dev container builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and start the dev container (same config Codespaces uses)
+        run: npx -y @devcontainers/cli@latest up --workspace-folder . --skip-post-create
+      - name: Docker and Compose work inside it
+        run: |
+          npx -y @devcontainers/cli@latest exec --workspace-folder . bash scripts/codespace-start.sh --check
+      - name: Docker daemon diagnostics
+        if: failure()
+        run: |
+          npx -y @devcontainers/cli@latest exec --workspace-folder . bash -c 'ps aux | grep -i docker; echo ---; tail -n 60 /tmp/dockerd.log 2>/dev/null || echo "no /tmp/dockerd.log"' || true
+          docker ps -a
+          docker inspect --format '{{json .Config.Entrypoint}} {{json .Config.Cmd}}' $(docker ps -q | head -1) || true
+
+  e2e:
+    name: End-to-end (Docker stack + Playwright)
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate test environment
+        run: ./scripts/setup-env.sh --url http://localhost:3000
+      - name: Build and start the stack
+        run: docker compose up -d --build --wait --wait-timeout 600
+      - name: Stack status
+        if: always()
+        run: docker compose ps
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install Playwright
+        working-directory: e2e
+        run: npm install --no-audit --no-fund && npx playwright install --with-deps chromium
+      - name: Run end-to-end tests
+        working-directory: e2e
+        run: npx playwright test
+      - name: Container logs
+        if: failure()
+        run: docker compose logs --no-color --tail=300 api web worker scheduler
+      - name: Upload screenshots and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-screenshots
+          path: |
+            e2e/screenshots
+            e2e/playwright-report
+          retention-days: 14
+      - name: Publish screenshots to the ci/e2e-screenshots branch (review without downloading artifacts)
+        if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          [ -d e2e/screenshots ] || exit 0
+          cd e2e/screenshots
+          git init -q -b ci/e2e-screenshots
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          echo "Screenshots from CI run ${{ github.run_id }} for ${{ github.event.pull_request.head.sha }}" > README.md
+          git add -A && git commit -qm "E2E screenshots for ${{ github.event.pull_request.head.sha }}"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ci/e2e-screenshots

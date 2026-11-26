@@ -4,241 +4,255 @@ namespace App\Http\Controllers\Api\V1\Security;
 
 use App\Http\Controllers\Controller;
 use App\Models\AccessLog;
-use App\Models\AppNotification;
-use App\Models\GuestPass;
-use App\Models\BlacklistEntry;
-use App\Models\EstateAlert;
+use App\Models\AwayNotice;
+use App\Models\EmergencyAlert;
+use App\Models\IncidentNote;
+use App\Models\IncidentReport;
 use App\Models\User;
+use App\Models\VisitorPass;
+use App\Services\AuditLogger;
+use App\Services\CodeGenerator;
+use App\Services\Security\AlertService;
+use App\Support\ApiResponse;
+use App\Support\Present;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Arr;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
+/**
+ * M08 security & emergency: resident panic, the security response console (SCR-SEC-01/02/05),
+ * intelligence / incident reports (SCR-SEC-06–08) and the security HQ dashboard (SCR-DASH-04).
+ */
 class SecurityController extends Controller
 {
-    // ---------------- emergency ----------------
-    public function emergency(): JsonResponse
+    public function __construct(private readonly AlertService $alerts, private readonly AuditLogger $audit, private readonly CodeGenerator $codes) {}
+
+    // ------------------------------------------------------------ residents
+
+    public function raise(Request $request): JsonResponse
     {
-        $open = EstateAlert::with('sender')->where('status', 'open')->latest('id')->get();
-        $history = EstateAlert::with('sender')->latest('id')->limit(50)->get();
-
-        $active = $open->values()->map(fn (EstateAlert $a, int $i) => [
-            'id' => (string) $a->id,
-            'variant' => $i === 0 ? 'primary' : 'secondary',
-            'severity' => $a->category === 'life_threat' ? 'CRITICAL' : 'SUSPICIOUS',
-            'title' => $a->category === 'life_threat' ? 'Life Under Threat' : 'Intelligence Report',
-            'location' => $a->location ?: 'Location not given',
-            'section' => '',
-            'detail' => $a->message,
-            'resident' => $a->sender?->name ?? 'Unknown',
-            'timeElapsed' => $a->created_at?->diffForHumans(null, true) ?? '',
-            'dispatched' => 'Not assigned',
+        $data = $request->validate([
+            'type' => ['required', Rule::in(EmergencyAlert::TYPES)],
+            'lat' => ['nullable', 'numeric', 'between:-90,90'],
+            'lng' => ['nullable', 'numeric', 'between:-180,180'],
+            'description' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $rows = $history->map(fn (EstateAlert $a) => [
-            'id' => (string) $a->id,
-            'date' => $a->created_at?->format('M d, Y'),
-            'time' => $a->created_at?->format('h:i A'),
-            'alertType' => $a->category === 'life_threat' ? 'Life Threat' : 'Intelligence',
-            'resident' => $a->sender?->name ?? 'Unknown',
-            'location' => $a->location ?: '-',
-            'status' => $a->status === 'resolved' ? 'Resolved' : 'Pending',
-        ]);
+        $alert = $this->alerts->raise($request->user(), $data['type'], $data['lat'] ?? null, $data['lng'] ?? null, $data['description'] ?? null);
+
+        return response()->json(['data' => Present::alert($alert->load(['raiser', 'unit', 'events.actor']))], 201);
+    }
+
+    public function myAlerts(Request $request): JsonResponse
+    {
+        $page = EmergencyAlert::query()->with(['unit', 'responder', 'events.actor'])->where('raised_by', $request->user()->id)
+            ->latest()->paginate(ApiResponse::pageSize($request));
+
+        return ApiResponse::paginateMap($page, fn ($a) => Present::alert($a));
+    }
+
+    public function cancel(Request $request, EmergencyAlert $alert): JsonResponse
+    {
+        abort_unless($alert->raised_by === $request->user()->id, 404);
+
+        return response()->json(['data' => Present::alert($this->alerts->transition($alert, 'cancelled', $request->user(), 'Cancelled by resident')->load(['unit', 'events.actor']))]);
+    }
+
+    // ------------------------------------------------------------ security console
+
+    public function overview(): JsonResponse
+    {
+        $today = now()->startOfDay();
 
         return response()->json(['data' => [
-            'active' => $active,
-            'history' => $rows,
-            'total' => EstateAlert::count(),
-            'contacts' => config('estate.emergency_contacts', []),
-        ]]);
-    }
-
-    /** Guard-filed report from the "Report an incident" panel. */
-    public function reportIncident(Request $r): JsonResponse
-    {
-        $d = $r->validate([
-            'category' => 'required|in:life_threat,intelligence',
-            'message' => 'required|string|max:255',
-            'location' => 'nullable|string|max:255',
-        ]);
-        $me = $r->user();
-        $alert = EstateAlert::create($d + ['sender_id' => $me->id]);
-        foreach (User::whereIn('role', ['super_admin', 'admin', 'manager', 'security'])->where('id', '!=', $me->id)->pluck('id') as $uid) {
-            AppNotification::create([
-                'user_id' => $uid, 'type' => 'alert', 'title' => $me->name.' sent you an alert',
-                'body' => $alert->message, 'data' => ['alert_id' => $alert->id, 'category' => $alert->category],
-            ]);
-        }
-        return response()->json(['data' => ['id' => $alert->id]], 201);
-    }
-
-    // ---------------- blacklist / watchlist ----------------
-    private function entryOut(BlacklistEntry $e): array
-    {
-        return [
-            'id' => (string) $e->id,
-            'name' => $e->name,
-            'entityId' => $e->entity_ref ? 'ID: '.$e->entity_ref : '',
-            'entityType' => $e->entity_type,
-            'reason' => $e->reason,
-            'reasonDetail' => $e->details ?? '',
-            'riskLevel' => $e->risk_level,
-            'status' => $e->status,
-            'lastAttemptedDate' => $e->last_attempt_at?->format('M d, Y') ?? '—',
-            'lastAttemptedTime' => $e->last_attempt_at?->format('H:i') ?? '—',
-            'lastAttemptedLocation' => $e->last_attempt_location ?? '—',
-        ];
-    }
-
-    public function blacklist(): JsonResponse
-    {
-        $black = BlacklistEntry::where('list_type', 'blacklist')->latest('id')->get();
-        $watch = BlacklistEntry::where('list_type', 'watchlist')->latest('id')->get();
-
-        return response()->json(['data' => [
-            'entries' => $black->map(fn ($e) => $this->entryOut($e))->values(),
-            'watchlist' => $watch->map(fn ($e) => $this->entryOut($e))->values(),
-            'stats' => [
-                'totalBlacklisted' => $black->where('status', '!=', 'CLEARED')->count(),
-                'highRiskAlerts' => $black->whereIn('risk_level', ['HIGH', 'EXTREME'])->where('status', '!=', 'CLEARED')->count(),
-                'watchlistEntries' => $watch->count(),
-                'clearedRemoved' => $black->where('status', 'CLEARED')->count(),
+            'activeAlerts' => EmergencyAlert::with(['raiser', 'unit'])->whereIn('status', EmergencyAlert::ACTIVE)->latest()->get()->map(fn ($a) => Present::alert($a)),
+            'kpis' => [
+                'activeAlerts' => EmergencyAlert::whereIn('status', EmergencyAlert::ACTIVE)->count(),
+                'alertsToday' => EmergencyAlert::where('created_at', '>=', $today)->count(),
+                'visitorsInside' => VisitorPass::query()->inside()->count(),
+                'entriesToday' => AccessLog::where('direction', 'in')->where('occurred_at', '>=', $today)->where(fn ($q) => $q->whereNull('flag_reason')->orWhere('flag_reason', 'not like', 'REFUSED%'))->count(),
+                'refusedToday' => AccessLog::where('flag_reason', 'like', 'REFUSED%')->where('occurred_at', '>=', $today)->count(),
+                'openIncidents' => IncidentReport::where('status', '!=', 'closed')->count(),
+                'awayHouseholds' => AwayNotice::where('status', 'active')->whereDate('from_date', '<=', now())->whereDate('to_date', '>=', now())->count(),
             ],
+            'recentAccess' => AccessLog::with(['household.unit', 'pass', 'officer'])->latest('occurred_at')->limit(8)->get()->map(fn ($l) => Present::accessLog($l)),
+            'avgResponseMinutes' => $this->averageResponseMinutes(),
         ]]);
     }
 
-    public function addEntry(Request $r): JsonResponse
+    public function alerts(Request $request): JsonResponse
     {
-        $d = $r->validate([
-            'name' => 'required|string|max:255',
-            'entity_ref' => 'nullable|string|max:120',
-            'reason' => 'required|string|max:255',
-            'details' => 'nullable|string|max:2000',
-            'risk_level' => ['required', Rule::in(['LOW', 'MEDIUM', 'ELEVATED', 'HIGH', 'EXTREME'])],
-            'list_type' => ['nullable', Rule::in(['blacklist', 'watchlist'])],
-            'entity_type' => ['nullable', Rule::in(['person', 'organisation', 'network', 'vehicle'])],
-            'notify_officers' => 'nullable|boolean',
-        ]);
-        $entry = BlacklistEntry::create([
-            'name' => $d['name'], 'entity_ref' => $d['entity_ref'] ?? null, 'reason' => $d['reason'],
-            'details' => $d['details'] ?? null, 'risk_level' => $d['risk_level'],
-            'list_type' => $d['list_type'] ?? 'blacklist', 'entity_type' => $d['entity_type'] ?? 'person',
-            'status' => ($d['list_type'] ?? 'blacklist') === 'watchlist' ? 'UNDER_OBSERVATION' : 'RESTRICTED',
-            'added_by' => $r->user()->id,
+        $f = $request->validate([
+            'status' => ['nullable', Rule::in(['active', 'raised', 'acknowledged', 'dispatched', 'resolved', 'false_alarm', 'cancelled'])],
+            'type' => ['nullable', Rule::in(EmergencyAlert::TYPES)],
         ]);
 
-        if ($r->boolean('notify_officers')) {
-            foreach (User::where('role', 'security')->where('id', '!=', $r->user()->id)->pluck('id') as $uid) {
-                AppNotification::create([
-                    'user_id' => $uid, 'type' => 'system', 'title' => $entry->name.' added to the '.$entry->list_type,
-                    'body' => $entry->reason, 'data' => ['blacklist_id' => $entry->id],
-                ]);
-            }
+        $page = EmergencyAlert::query()->with(['raiser', 'unit', 'responder'])
+            ->when($f['status'] ?? null, fn ($q, $v) => $v === 'active' ? $q->whereIn('status', EmergencyAlert::ACTIVE) : $q->where('status', $v))
+            ->when($f['type'] ?? null, fn ($q, $v) => $q->where('type', $v))
+            ->latest()->paginate(ApiResponse::pageSize($request, 15));
+
+        return ApiResponse::paginateMap($page, fn ($a) => Present::alert($a));
+    }
+
+    public function showAlert(EmergencyAlert $alert): JsonResponse
+    {
+        return response()->json(['data' => Present::alert($alert->load(['raiser', 'unit', 'responder', 'events.actor']))]);
+    }
+
+    public function transitionAlert(Request $request, EmergencyAlert $alert): JsonResponse
+    {
+        $data = $request->validate([
+            'status' => ['required', Rule::in(['acknowledged', 'dispatched', 'resolved', 'false_alarm'])],
+            'note' => ['nullable', 'string', 'max:1000'],
+            'responder_id' => ['nullable', 'integer', 'exists:users,id'],
+        ]);
+
+        $alert = $this->alerts->transition($alert, $data['status'], $request->user(), $data['note'] ?? null, $data['responder_id'] ?? null);
+
+        return response()->json(['data' => Present::alert($alert->load(['raiser', 'unit', 'responder', 'events.actor']))]);
+    }
+
+    /** Security officers available for dispatch. */
+    public function officers(): JsonResponse
+    {
+        return response()->json(['data' => User::query()->where('status', 'active')
+            ->whereHas('roles', fn ($q) => $q->where('code', 'security_officer'))->orderBy('name')->get(['id', 'name', 'phone'])]);
+    }
+
+    // ------------------------------------------------------------ incident / intelligence reports
+
+    public function incidents(Request $request): JsonResponse
+    {
+        $f = $request->validate([
+            'status' => ['nullable', Rule::in(['open', 'investigating', 'closed'])],
+            'severity' => ['nullable', Rule::in(IncidentReport::SEVERITIES)],
+            'q' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $page = IncidentReport::query()->with(['reporter', 'assignee'])
+            ->when($f['status'] ?? null, fn ($q, $v) => $q->where('status', $v))
+            ->when($f['severity'] ?? null, fn ($q, $v) => $q->where('severity', $v))
+            ->when($f['q'] ?? null, fn ($q, $v) => $q->where(fn ($w) => $w->where('title', 'like', "%{$v}%")->orWhere('reference', 'like', "%{$v}%")))
+            ->orderByRaw("CASE severity WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END")
+            ->latest()->paginate(ApiResponse::pageSize($request, 15));
+
+        return ApiResponse::paginateMap($page, fn ($r) => Present::incident($r), [
+            'kpis' => [
+                'open' => IncidentReport::where('status', 'open')->count(),
+                'investigating' => IncidentReport::where('status', 'investigating')->count(),
+                'critical' => IncidentReport::where('severity', 'critical')->where('status', '!=', 'closed')->count(),
+                'closedThisMonth' => IncidentReport::where('status', 'closed')->where('closed_at', '>=', now()->startOfMonth())->count(),
+            ],
+        ]);
+    }
+
+    /** GET /resident/reports — reports this resident has sent to security, with their progress. */
+    public function myReports(Request $request): JsonResponse
+    {
+        $page = IncidentReport::query()->with(['reporter', 'notes.user'])->where('reported_by', $request->user()->id)
+            ->latest()->paginate(ApiResponse::pageSize($request));
+
+        // Residents see status and the security team's replies, not internal assignment details.
+        return ApiResponse::paginateMap($page, fn ($r) => Arr::except(Present::incident($r), ['assignedTo']));
+    }
+
+    /**
+     * POST /resident/reports — a resident reports a security concern (Figma "Report"). It lands in the
+     * security team's incident list and every on-duty officer is notified. For danger now, use PANIC.
+     */
+    public function storeResidentReport(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'title' => ['required', 'string', 'min:5', 'max:150'],
+            'category' => ['required', Rule::in(IncidentReport::CATEGORIES)],
+            'location' => ['nullable', 'string', 'max:150'],
+            'description' => ['required', 'string', 'min:10', 'max:5000'],
+        ]);
+        $user = $request->user();
+        $unit = $user->household()?->unit?->unit_code;
+
+        $report = IncidentReport::create($data + [
+            'reference' => $this->codes->next('incident_reports', 'reference', 'IR', 5),
+            'severity' => 'medium',
+            'location' => $data['location'] ?? ($unit ? "Unit {$unit}" : null),
+            'reported_by' => $user->id,
+            'status' => 'open',
+        ]);
+        $this->audit->log('incident.reported_by_resident', $report, after: $data);
+
+        $officers = \App\Models\User::query()->where('status', 'active')
+            ->whereHas('roles', fn ($q) => $q->where('code', 'security_officer'))->get();
+        \Illuminate\Support\Facades\Notification::send($officers, new \App\Notifications\GenericNotification(
+            'Resident report: '.$report->title,
+            $user->name.($unit ? " (Unit {$unit})" : '').' reported '.str_replace('_', ' ', $report->category).'.',
+            '/security/incidents',
+            'security',
+        ));
+
+        return response()->json(['data' => Arr::except(Present::incident($report->load(['reporter', 'notes'])), ['assignedTo'])], 201);
+    }
+
+    public function storeIncident(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'title' => ['required', 'string', 'min:5', 'max:150'],
+            'category' => ['required', Rule::in(IncidentReport::CATEGORIES)],
+            'severity' => ['required', Rule::in(IncidentReport::SEVERITIES)],
+            'location' => ['nullable', 'string', 'max:150'],
+            'description' => ['required', 'string', 'min:10', 'max:5000'],
+            'assigned_to' => ['nullable', 'integer', 'exists:users,id'],
+        ]);
+
+        $report = IncidentReport::create($data + [
+            'reference' => $this->codes->next('incident_reports', 'reference', 'IR', 5),
+            'reported_by' => $request->user()->id,
+            'status' => 'open',
+        ]);
+        $this->audit->log('incident.created', $report, after: $data);
+
+        return response()->json(['data' => Present::incident($report->load(['reporter', 'assignee', 'notes']))], 201);
+    }
+
+    public function showIncident(IncidentReport $incident): JsonResponse
+    {
+        return response()->json(['data' => Present::incident($incident->load(['reporter', 'assignee', 'notes.user']))]);
+    }
+
+    public function updateIncident(Request $request, IncidentReport $incident): JsonResponse
+    {
+        $data = $request->validate([
+            'status' => ['sometimes', Rule::in(['open', 'investigating', 'closed'])],
+            'severity' => ['sometimes', Rule::in(IncidentReport::SEVERITIES)],
+            'assigned_to' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+        ]);
+
+        $before = $incident->only(array_keys($data));
+        if (($data['status'] ?? null) === 'closed' && $incident->status !== 'closed') {
+            $data['closed_at'] = now();
         }
-        return response()->json(['data' => $this->entryOut($entry)], 201);
+        $incident->update($data);
+        $this->audit->log('incident.updated', $incident, $before, $data);
+
+        return response()->json(['data' => Present::incident($incident->load(['reporter', 'assignee', 'notes.user']))]);
     }
 
-    public function updateEntry(Request $r, int $id): JsonResponse
+    public function addNote(Request $request, IncidentReport $incident): JsonResponse
     {
-        $d = $r->validate([
-            'status' => ['sometimes', Rule::in(['RESTRICTED', 'UNDER_OBSERVATION', 'UNDER_REVIEW', 'CLEARED'])],
-            'risk_level' => ['sometimes', Rule::in(['LOW', 'MEDIUM', 'ELEVATED', 'HIGH', 'EXTREME'])],
-            'last_attempt_at' => 'sometimes|nullable|date',
-            'last_attempt_location' => 'sometimes|nullable|string|max:255',
-        ]);
-        $entry = BlacklistEntry::findOrFail($id);
-        $entry->update($d);
-        return response()->json(['data' => $this->entryOut($entry)]);
+        $body = $request->validate(['body' => ['required', 'string', 'min:2', 'max:2000']])['body'];
+        IncidentNote::create(['incident_report_id' => $incident->id, 'user_id' => $request->user()->id, 'body' => $body]);
+
+        return response()->json(['data' => Present::incident($incident->load(['reporter', 'assignee', 'notes.user']))], 201);
     }
 
-    // ---------------- access control ----------------
-    public function access(): JsonResponse
+    private function averageResponseMinutes(): ?float
     {
-        $logs = AccessLog::latest('occurred_at')->limit(50)->get();
-        $row = fn (AccessLog $l) => [
-            'id' => (string) $l->id,
-            'name' => $l->name,
-            'role' => $l->role_label ?? '',
-            'gateNo' => $l->gate,
-            'verificationType' => $l->verification_type,
-            'status' => $l->status,
-            'timestamp' => $l->occurred_at?->format('H:i:s'),
-        ];
+        $rows = EmergencyAlert::whereNotNull('acknowledged_at')->where('created_at', '>=', now()->subDays(30))->get(['created_at', 'acknowledged_at']);
+        if ($rows->isEmpty()) {
+            return null;
+        }
 
-        $latestOk = AccessLog::whereIn('status', ['Authorised', 'Success'])->latest('occurred_at')->first();
-        $latestDenied = AccessLog::whereIn('status', ['Denied', 'Flagged'])->latest('occurred_at')->first();
-
-        // Entries per hour for the last 12 hours, scaled 0-100 for the bar chart.
-        $start = now()->subHours(11)->startOfHour();
-        $counts = array_fill(0, 12, 0);
-        AccessLog::where('occurred_at', '>=', $start)->pluck('occurred_at')->each(function ($t) use (&$counts, $start) {
-            $i = (int) floor($start->diffInHours($t));
-            if ($i >= 0 && $i < 12) { $counts[$i]++; }
-        });
-        $max = max(1, max($counts));
-        $bars = array_map(fn ($c) => ['height' => (int) round($c / $max * 100), 'active' => $c === $max && $c > 0], $counts);
-
-        $passes = GuestPass::where('status', 'active')->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))
-            ->latest('id')->limit(10)->get()->map(function (GuestPass $p) {
-                $mins = $p->expires_at ? (int) now()->diffInMinutes($p->expires_at, false) : null;
-                return [
-                    'id' => (string) $p->id,
-                    'name' => $p->name,
-                    'subtitle' => $mins !== null ? "Expiring in {$mins}m" : ($p->invited_by ? "Invited by {$p->invited_by}" : 'One-time entry'),
-                    'status' => $mins !== null && $mins <= 15 ? 'expiring' : 'cleared',
-                ];
-            });
-
-        return response()->json(['data' => [
-            'logs' => $logs->map($row)->values(),
-            'total' => AccessLog::count(),
-            'trafficBars' => $bars,
-            'entriesLast12h' => array_sum($counts),
-            'latestVerified' => $latestOk ? [
-                'name' => $latestOk->name, 'role' => $latestOk->role_label ?? '', 'verificationType' => $latestOk->verification_type,
-                'gate' => $latestOk->gate, 'time' => $latestOk->occurred_at?->format('H:i'),
-            ] : null,
-            'latestDenied' => $latestDenied ? [
-                'name' => $latestDenied->name, 'time' => $latestDenied->occurred_at?->format('H:i'),
-                'reason' => $latestDenied->failure_reason ?? $latestDenied->status, 'gate' => $latestDenied->gate,
-            ] : null,
-            'passes' => $passes->values(),
-        ]]);
-    }
-
-    public function logAccess(Request $r): JsonResponse
-    {
-        $d = $r->validate([
-            'name' => 'required|string|max:255',
-            'role_label' => 'nullable|string|max:255',
-            'gate' => 'required|string|max:120',
-            'verification_type' => ['required', Rule::in(['Face ID', 'QR Code', 'Manual', 'Biometric'])],
-            'status' => ['required', Rule::in(['Authorised', 'Success', 'Denied', 'Flagged'])],
-            'failure_reason' => 'nullable|string|max:255',
-            'user_id' => 'nullable|integer|exists:users,id',
-            'direction' => ['nullable', Rule::in(['in', 'out'])],
-            'person_type' => ['nullable', Rule::in(['Resident', 'Visitor', 'Service'])],
-            'house_no' => 'nullable|string|max:60',
-            'vehicle_plate' => 'nullable|string|max:20',
-            'companions' => 'nullable|string|max:255',
-            'occurred_at' => 'nullable|date',
-        ]);
-        $log = AccessLog::create(array_merge($d, ['logged_by' => $r->user()->id, 'occurred_at' => $d['occurred_at'] ?? now()]));
-        return response()->json(['data' => ['id' => $log->id]], 201);
-    }
-
-    public function createPass(Request $r): JsonResponse
-    {
-        $d = $r->validate([
-            'name' => 'required|string|max:255',
-            'invited_by' => 'nullable|string|max:120',
-            'expires_in_minutes' => 'nullable|integer|min:5|max:10080',
-        ]);
-        $pass = GuestPass::create([
-            'name' => $d['name'], 'invited_by' => $d['invited_by'] ?? null,
-            'kind' => isset($d['expires_in_minutes']) ? 'timed' : 'one_time',
-            'expires_at' => isset($d['expires_in_minutes']) ? now()->addMinutes($d['expires_in_minutes']) : null,
-            'created_by' => $r->user()->id,
-        ]);
-        return response()->json(['data' => ['id' => $pass->id]], 201);
+        return round($rows->avg(fn ($a) => $a->created_at->diffInSeconds($a->acknowledged_at, true)) / 60, 1);
     }
 }

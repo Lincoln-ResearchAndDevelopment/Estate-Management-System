@@ -8,12 +8,13 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        $this->call([
-            RolesSeeder::class,      // must run before users so the observer can assign roles
-            UserSeeder::class,       // admin module
-            DashboardSeeder::class,  // admin module
-            StaffSeeder::class,      // admin module
-            StoreDashboardSeeder::class, // store module
-        ]);
+        $this->call(RolePermissionSeeder::class);
+
+        // Demonstration data is only seeded outside production and is clearly marked as test data.
+        if (! app()->isProduction()) {
+            $this->call(DemoDataSeeder::class);
+        } else {
+            $this->call(InitialAdminSeeder::class);
+        }
     }
 }
