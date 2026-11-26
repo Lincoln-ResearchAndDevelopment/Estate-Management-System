@@ -4,13 +4,13 @@
   // "base:ubuntu" now points to, which drops the codespace into recovery mode.
   "image": "mcr.microsoft.com/devcontainers/base:jammy",
   "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+    "ghcr.io/devcontainers/features/docker-in-docker:4": {
       "version": "latest",
       "moby": true,
       "dockerDashComposeVersion": "v2",
-      // Keep the nftables backend: current host kernels no longer provide the legacy iptables "nat" table,
-      // and dockerd exits with "can't initialize iptables table `nat'" when forced onto iptables-legacy.
-      "iptables": false
+      // Choose the iptables backend when the container starts: current host kernels no longer provide the
+      // legacy "nat" table, and dockerd exits with "can't initialize iptables table `nat'" if forced onto it.
+      "iptablesSwitchAtRuntime": true
     }
   },
   // A 2-core codespace has 8 GB RAM, enough for MySQL + the image builds. 4-core builds faster if offered.
