@@ -31,6 +31,7 @@ class Present
     {
         return [
             'id' => $b->id,
+            'householdId' => $b->household_id,
             'reference' => $b->reference,
             'description' => $b->description,
             'periodLabel' => $b->period_label,

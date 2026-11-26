@@ -12,6 +12,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states";
 import { SearchInput } from "@/components/shared/search-input";
 import type { Store } from "@/types/modules";
+import { MarketplaceTabs } from "@/components/shared/link-tabs";
 
 const CATEGORIES = ["groceries", "pharmacy", "food", "laundry", "services", "other"];
 
@@ -27,6 +28,7 @@ export default function MarketPage() {
   return (
     <>
       <PageHeader title="Estate marketplace" description="Order from stores approved by estate management. You pay the store on delivery." breadcrumbs={[{ label: "Home", href: "/resident" }, { label: "Marketplace" }]} />
+      <MarketplaceTabs />
       <div className="mb-4 flex flex-col gap-3 sm:flex-row">
         <SearchInput value={params.q} onChange={(v) => update({ q: v })} placeholder="Search stores" />
         <Select className="sm:w-48" value={params.category} onChange={(e) => update({ category: e.target.value })} aria-label="Category">

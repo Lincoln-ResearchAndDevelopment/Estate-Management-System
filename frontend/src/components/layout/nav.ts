@@ -12,6 +12,7 @@ import {
   Home,
   KeyRound,
   LayoutDashboard,
+  MapPinned,
   ListChecks,
   Megaphone,
   MessageSquareText,
@@ -20,7 +21,6 @@ import {
   PlusSquare,
   Receipt,
   Settings,
-  ShieldAlert,
   ShieldBan,
   ShieldCheck,
   ShoppingBag,
@@ -39,6 +39,8 @@ export interface NavItem {
   icon: LucideIcon;
   /** Shown when the user has any of these permissions. Empty = every signed-in user of the portal. */
   permissions?: string[];
+  /** Other paths that keep this item highlighted (pages reached from it that have no menu entry). */
+  also?: string[];
   badgeKey?: "pendingListings" | "pendingAccessRequests" | "pendingAgents" | "newEnquiries" | "unreadMessages" | "activeAlerts";
 }
 
@@ -92,7 +94,7 @@ export const NAVIGATION: Record<Portal, NavSection[]> = {
     },
     {
       title: "Security",
-      items: [{ label: "Security Console", href: "/security", icon: Siren, permissions: ["security.respond", "access.view"] }],
+      items: [{ label: "Security Console", href: "/security", icon: Siren, permissions: ["security.respond", "security.view", "access.view"] }],
     },
     {
       title: "Property Listings",
@@ -126,32 +128,27 @@ export const NAVIGATION: Record<Portal, NavSection[]> = {
     },
     ACCOUNT,
   ],
+  // Exactly the Figma resident sidebar (node 295:2443): Dashboard, Finance, Marketplace, Messages, Report,
+  // Direction — then the PANIC button and Logout in the sidebar footer (see AppShell). Profile, household and
+  // account settings are in the user menu at the top right.
   resident: [
     {
       items: [
-        { label: "Home", href: "/resident", icon: LayoutDashboard },
-        { label: "My Household", href: "/resident/household", icon: Users, permissions: ["finance.pay_own", "household.manage_own"] },
-        { label: "Bills & Payments", href: "/resident/finance", icon: Wallet, permissions: ["finance.pay_own"] },
-        { label: "Visitors & Gate", href: "/resident/visitors", icon: DoorOpen, permissions: ["access.manage_own"] },
-        { label: "Emergency", href: "/resident/emergency", icon: ShieldAlert, permissions: ["alerts.raise"] },
+        { label: "Dashboard", href: "/resident", icon: LayoutDashboard, also: ["/resident/visitors", "/resident/household", "/resident/emergency"] },
+        { label: "Finance", href: "/resident/finance", icon: Wallet, permissions: ["finance.pay_own"] },
+        { label: "Marketplace", href: "/resident/market", icon: ShoppingBag, permissions: ["market.shop"], also: ["/resident/orders"] },
+        { label: "Messages", href: "/messages", icon: MessageSquareText, permissions: ["comms.use"], badgeKey: "unreadMessages", also: ["/community", "/notices"] },
+        { label: "Report", href: "/resident/report", icon: FileWarning, permissions: ["alerts.raise"] },
+        { label: "Direction", href: "/resident/direction", icon: MapPinned },
       ],
     },
-    {
-      title: "Marketplace",
-      items: [
-        { label: "Shop", href: "/resident/market", icon: ShoppingBag, permissions: ["market.shop"] },
-        { label: "My Orders", href: "/resident/orders", icon: Package, permissions: ["market.shop"] },
-      ],
-    },
-    COMMUNITY,
-    ACCOUNT,
   ],
   security: [
     {
       title: "Operations",
       items: [
-        { label: "HQ Dashboard", href: "/security", icon: LayoutDashboard, permissions: ["security.respond", "access.view"] },
-        { label: "Emergency Alerts", href: "/security/alerts", icon: Siren, permissions: ["security.respond"], badgeKey: "activeAlerts" },
+        { label: "HQ Dashboard", href: "/security", icon: LayoutDashboard, permissions: ["security.respond", "security.view", "access.view"] },
+        { label: "Emergency Alerts", href: "/security/alerts", icon: Siren, permissions: ["security.respond", "security.view"], badgeKey: "activeAlerts" },
         { label: "Gate Control", href: "/security/gate", icon: DoorOpen, permissions: ["access.gate"] },
         { label: "Access Logs", href: "/security/logs", icon: Car, permissions: ["access.view", "access.gate"] },
         { label: "Blacklist & Watchlist", href: "/security/blacklist", icon: ShieldBan, permissions: ["blacklist.view"] },

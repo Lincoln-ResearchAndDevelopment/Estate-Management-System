@@ -3,6 +3,7 @@ import type { Money } from "./api";
 
 export interface Bill {
   id: number;
+  householdId: number;
   reference: string;
   description: string;
   periodLabel: string | null;
@@ -100,7 +101,25 @@ export interface VisitorPass {
   status: "active" | "used" | "expired" | "cancelled";
   unit: string | null;
   host: string | null;
+  /** What the QR code encodes; the gate scans it. */
+  qrPayload: string | null;
+  /** Link the resident sends the visitor; opens the QR on the visitor's phone. */
+  shareUrl: string | null;
   createdAt: string;
+}
+
+/** The resident's own estate pass (QR) and dues clearance. */
+export interface EstatePass {
+  name: string;
+  relationship: string | null;
+  unit: string | null;
+  street: string | null;
+  estate: string;
+  qrPayload: string;
+  cleared: boolean;
+  outstanding: Money;
+  dueBills: number;
+  checkedAt: string;
 }
 
 export interface AccessLog {

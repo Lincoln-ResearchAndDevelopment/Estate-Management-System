@@ -34,7 +34,7 @@ class AccessController extends Controller
 
         VisitorPass::query()->where('household_id', $household->id)->where('status', 'active')->where('valid_until', '<', now())->update(['status' => 'expired']);
 
-        $page = VisitorPass::query()->with('creator')->where('household_id', $household->id)
+        $page = VisitorPass::query()->with(['creator', 'household.unit'])->where('household_id', $household->id)
             ->when($status, fn ($q, $v) => $q->where('status', $v))
             ->latest()->paginate(ApiResponse::pageSize($request));
 

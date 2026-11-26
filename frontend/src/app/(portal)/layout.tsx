@@ -14,7 +14,7 @@ const PORTAL_ACCESS: Record<Portal, string[] | "resident"> = {
   admin: ["dashboard.admin", "users.view", "listings.review", "access_requests.view", "agents.view", "audit.view"],
   agent: ["listings.manage_own"],
   resident: "resident",
-  security: ["security.respond", "access.gate", "access.view", "blacklist.view", "security.reports"],
+  security: ["security.respond", "security.view", "access.gate", "access.view", "blacklist.view", "security.reports"],
   store: ["store.manage_own"],
 };
 

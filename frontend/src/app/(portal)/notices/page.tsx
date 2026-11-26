@@ -23,6 +23,7 @@ import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/modules/auth/auth-provider";
 import type { Announcement, Meeting } from "@/types/modules";
+import { MessagesTabs } from "@/components/shared/link-tabs";
 
 const noticeSchema = z.object({
   title: z.string().trim().min(3, "Enter a title.").max(150),
@@ -104,6 +105,7 @@ export default function NoticesPage() {
           ? <Button onClick={() => setNoticeOpen(true)}><Plus className="h-4 w-4" /> New notice</Button>
           : <Button onClick={() => setMeetingOpen(true)}><Plus className="h-4 w-4" /> Schedule meeting</Button>)}
       />
+      <MessagesTabs />
       <Tabs className="mb-4" value={tab} onChange={setTab} items={[{ value: "notices", label: "Notices" }, { value: "meetings", label: "Meetings" }]} />
 
       {tab === "notices" ? (

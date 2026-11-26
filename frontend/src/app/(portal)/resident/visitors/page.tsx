@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Copy, DoorOpen, Plane, Plus, XCircle } from "lucide-react";
+import { Plane, Plus, QrCode as QrIcon, XCircle } from "lucide-react";
 import { api, type Paginated } from "@/lib/api";
 import { formatDate, formatDateTime, titleCase } from "@/lib/format";
 import { applyFieldErrors, localToIso, toLocalInput, useAction } from "@/hooks/use-action";
@@ -20,6 +21,7 @@ import { StatusPill } from "@/components/ui/status-pill";
 import { Tabs } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/toast";
 import { NIGERIAN_PHONE, PHONE_MESSAGE } from "@/modules/auth/password-schema";
+import { PassQrModal } from "@/modules/resident/pass-qr-modal";
 import type { AccessLog, AwayNotice, VisitorPass } from "@/types/modules";
 
 const passSchema = z
@@ -51,7 +53,9 @@ export default function VisitorsPage() {
   const { busy, run } = useAction();
   const [tab, setTab] = useState("passes");
   const [page, setPage] = useState(1);
-  const [passOpen, setPassOpen] = useState(false);
+  // Opened straight from the dashboard's "New pass" button (?new=1).
+  const searchParams = useSearchParams();
+  const [passOpen, setPassOpen] = useState(() => searchParams.get("new") === "1");
   const [awayOpen, setAwayOpen] = useState(false);
   const [created, setCreated] = useState<VisitorPass | null>(null);
   const [cancel, setCancel] = useState<{ kind: "pass" | "away"; id: number; label: string } | null>(null);
@@ -107,10 +111,8 @@ export default function VisitorsPage() {
     (cancel.kind === "pass" ? passes : away).refetch();
   };
 
-  const copy = (code: string) => navigator.clipboard?.writeText(code).then(() => toast.success("Code copied."), () => undefined);
-
   const passColumns: Column<VisitorPass>[] = [
-    { key: "code", header: "Gate code", cell: (p) => <button type="button" onClick={() => copy(p.code)} className="inline-flex items-center gap-1 font-mono text-base font-semibold tracking-widest text-army-900 hover:underline">{p.code}<Copy className="h-3.5 w-3.5" aria-hidden /></button> },
+    { key: "code", header: "Pass", cell: (p) => <Button size="sm" variant="outline" onClick={() => setCreated(p)} aria-label={`Show QR pass for ${p.visitorName}`}><QrIcon className="h-4 w-4" /> <span className="font-mono tracking-widest">{p.code}</span></Button> },
     { key: "visitor", header: "Visitor", cell: (p) => <div><p className="font-medium">{p.visitorName}</p><p className="text-xs text-ink-600">{[p.purpose, p.vehiclePlate].filter(Boolean).join(" · ") || "—"}</p></div> },
     { key: "valid", header: "Valid", cell: (p) => <span className="text-xs">{formatDateTime(p.validFrom)} →<br />{formatDateTime(p.validUntil)}</span>, hideOnMobile: true },
     { key: "entries", header: "Entries", cell: (p) => `${p.entriesUsed} / ${p.maxEntries}` },
@@ -129,7 +131,7 @@ export default function VisitorsPage() {
     <>
       <PageHeader
         title="Visitors & gate"
-        description="Give visitors a one-time code to show at the gate. You are notified when they arrive."
+        description="Create a QR pass for each visitor and share it with them. Security scans it at the gate and you are notified when they arrive."
         breadcrumbs={[{ label: "Home", href: "/resident" }, { label: "Visitors & gate" }]}
         actions={<><Button variant="outline" onClick={() => setAwayOpen(true)}><Plane className="h-4 w-4" /> I&apos;m travelling</Button><Button onClick={() => setPassOpen(true)}><Plus className="h-4 w-4" /> New visitor pass</Button></>}
       />
@@ -183,16 +185,7 @@ export default function VisitorsPage() {
         </form>
       </Modal>
 
-      <Modal open={!!created} onClose={() => setCreated(null)} title="Pass created" footer={<Button onClick={() => setCreated(null)}>Done</Button>}>
-        {created && (
-          <div className="text-center">
-            <DoorOpen className="mx-auto h-10 w-10 text-army-800" />
-            <p className="mt-3 text-sm text-ink-600">Share this code with {created.visitorName}. It works from {formatDateTime(created.validFrom)} to {formatDateTime(created.validUntil)}.</p>
-            <p className="my-4 font-mono text-4xl font-bold tracking-[0.3em] text-army-900">{created.code}</p>
-            <Button variant="outline" onClick={() => copy(created.code)}><Copy className="h-4 w-4" /> Copy code</Button>
-          </div>
-        )}
-      </Modal>
+      {created && <PassQrModal pass={created} onClose={() => setCreated(null)} title="Visitor pass ready" />}
 
       <Modal open={awayOpen} onClose={() => setAwayOpen(false)} title="Tell security you are away"
         footer={<><Button variant="outline" onClick={() => setAwayOpen(false)}>Cancel</Button><Button onClick={createAway} loading={awayForm.formState.isSubmitting}>Save</Button></>}>

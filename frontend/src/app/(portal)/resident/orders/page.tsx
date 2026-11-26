@@ -14,6 +14,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states";
 import { StatusPill } from "@/components/ui/status-pill";
 import type { Order } from "@/types/modules";
+import { MarketplaceTabs } from "@/components/shared/link-tabs";
 
 /** Orders the resident placed with estate stores, refreshed while any order is in progress. */
 export default function MyOrdersPage() {
@@ -36,6 +37,7 @@ export default function MyOrdersPage() {
   return (
     <>
       <PageHeader title="My orders" breadcrumbs={[{ label: "Marketplace", href: "/resident/market" }, { label: "My orders" }]} />
+      <MarketplaceTabs />
       {error ? <Card><ErrorState message={(error as Error).message} onRetry={() => refetch()} /></Card> : isLoading ? <Skeleton className="h-64" /> : !data?.data.length ? (
         <Card><EmptyState title="No orders yet" icon={<Package className="h-6 w-6" />} /></Card>
       ) : (

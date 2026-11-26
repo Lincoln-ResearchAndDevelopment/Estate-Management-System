@@ -19,7 +19,7 @@ const portals: Array<[string, string, string[]]> = [
   ["estate.manager", "/admin", ["/admin/residents", "/admin/staff", "/admin/stores", "/admin/reports", "/notices", "/community"]],
   ["finance.officer", "/admin", ["/admin/finance", "/admin/finance/bills", "/admin/finance/payments", "/admin/finance/outstanding", "/admin/finance/services"]],
   ["security.officer", "/security", ["/security", "/security/alerts", "/security/gate", "/security/logs", "/security/blacklist", "/security/incidents"]],
-  ["resident.head", "/resident", ["/resident", "/resident/household", "/resident/finance", "/resident/visitors", "/resident/emergency", "/resident/market", "/resident/orders", "/messages", "/account/security"]],
+  ["resident.head", "/resident", ["/resident", "/resident/finance", "/resident/market", "/messages", "/resident/report", "/resident/direction", "/resident/visitors", "/resident/household", "/resident/emergency"]],
   ["store.owner", "/store", ["/store", "/store/products", "/store/orders"]],
   ["agent", "/agent", ["/agent", "/agent/listings"]],
 ];
@@ -35,6 +35,14 @@ for (const [role, home, pages] of portals) {
     }
   });
 }
+
+test("resident sidebar matches the Figma menu, with PANIC above sign out", async ({ page }) => {
+  await signIn(page, "resident.head");
+  const nav = page.getByRole("navigation", { name: "Main" }).first();
+  const labels = (await nav.getByRole("link").allInnerTexts()).map((t) => t.replace(/\d+$/, "").trim());
+  expect(labels).toEqual(["Dashboard", "Finance", "Marketplace", "Messages", "Report", "Direction"]);
+  await expect(page.getByRole("button", { name: /panic/i }).first()).toBeVisible();
+});
 
 test("API health and session cookie flow through the proxy", async ({ request }) => {
   const res = await request.get("/api/v1/public/estate");

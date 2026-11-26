@@ -16,6 +16,7 @@ import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import type { ChatMessage, Conversation } from "@/types/modules";
+import { MessagesTabs } from "@/components/shared/link-tabs";
 
 interface Thread { conversation: Conversation; messages: ChatMessage[] }
 
@@ -32,6 +33,7 @@ export default function MessagesPage() {
   return (
     <>
       <PageHeader title="Messages" breadcrumbs={[{ label: "Messages" }]} actions={<Button onClick={() => setComposeOpen(true)}><MessageSquarePlus className="h-4 w-4" /> New message</Button>} />
+      <MessagesTabs />
       <Card className="grid min-h-[32rem] overflow-hidden md:grid-cols-[18rem_1fr]">
         <aside className={cn("border-line md:border-r", activeId && "hidden md:block")}>
           {list.error ? <ErrorState message={(list.error as Error).message} onRetry={() => list.refetch()} />
