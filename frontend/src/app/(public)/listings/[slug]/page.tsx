@@ -69,7 +69,7 @@ export default async function ListingDetailPage({ params }: { params: Params }) 
       <nav aria-label="Breadcrumb" className="mb-4 flex flex-wrap items-center gap-1 text-xs text-ink-600">
         <Link href="/" className="hover:underline">Home</Link>
         <ChevronRight className="h-3.5 w-3.5" aria-hidden />
-        <Link href={`/listings?type=${listing.listingType}`} className="hover:underline">For {listing.listingType}</Link>
+        <Link href={`/?type=${listing.listingType}#listings`} className="hover:underline">For {listing.listingType}</Link>
         <ChevronRight className="h-3.5 w-3.5" aria-hidden />
         <span className="font-medium text-ink-900">{listing.code}</span>
       </nav>

@@ -1,15 +1,29 @@
 import { expect, test } from "@playwright/test";
 import { expectHealthy, shot, signIn } from "./helpers";
 
-test("public site: landing, listings, request access", async ({ page }) => {
+test("public site: landing page with search and listings; header has only Sign in", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("link", { name: /listings|properties/i }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: /find your dream home in the estate/i })).toBeVisible();
+  const header = page.locator("header").first();
+  await expect(header.getByRole("link")).toHaveCount(2); // brand name + Sign in, no menu links
+  await expect(header.getByRole("link", { name: /sign in/i })).toBeVisible();
+  await expect(page.getByText(/\d+ listings?/).first()).toBeVisible();
+  await expect(page.getByText(/TEST –/).first()).toBeVisible();
   await shot(page, "01-landing");
 
-  await page.goto("/listings");
-  await expect(page.getByText(/TEST –/).first()).toBeVisible();
-  await shot(page, "02-listings");
+  // Search filters the listings on the same page.
+  await page.getByLabel(/rent or sale/i).selectOption("rent");
+  await page.getByRole("button", { name: /^search$/i }).click();
+  await expect(page).toHaveURL(/type=rent/);
+  await shot(page, "02-landing-search-rent");
 
+  // Old /listings links still work.
+  await page.goto("/listings?type=sale");
+  await expect(page).toHaveURL(/\/\?type=sale/);
+
+  await page.goto("/login");
+  await expect(page.getByRole("link", { name: /request access/i })).toBeVisible();
+  await expect(page.getByRole("link", { name: /agent account/i })).toBeVisible();
   await page.goto("/request-access");
   await shot(page, "03-request-access");
 });
