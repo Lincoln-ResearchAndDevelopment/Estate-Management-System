@@ -27,7 +27,7 @@ export default function MarketPage() {
 
   return (
     <>
-      <PageHeader title="Estate marketplace" description="Order from stores approved by estate management. You pay the store on delivery." breadcrumbs={[{ label: "Home", href: "/resident" }, { label: "Marketplace" }]} />
+      <PageHeader title="Estate marketplace" description="Order from stores approved by estate management. You pay the store on delivery." breadcrumbs={[{ label: "Dashboard", href: "/resident" }, { label: "Marketplace" }]} />
       <MarketplaceTabs />
       <div className="mb-4 flex flex-col gap-3 sm:flex-row">
         <SearchInput value={params.q} onChange={(v) => update({ q: v })} placeholder="Search stores" />

@@ -66,7 +66,7 @@ function Checkout() {
 export default function TestCheckoutPage() {
   return (
     <>
-      <PageHeader title="Complete payment" breadcrumbs={[{ label: "Bills & payments", href: "/resident/finance" }, { label: "Checkout" }]} />
+      <PageHeader title="Complete payment" breadcrumbs={[{ label: "Finance", href: "/resident/finance" }, { label: "Checkout" }]} />
       <Suspense><Checkout /></Suspense>
     </>
   );

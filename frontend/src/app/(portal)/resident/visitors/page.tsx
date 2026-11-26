@@ -132,7 +132,7 @@ export default function VisitorsPage() {
       <PageHeader
         title="Visitors & gate"
         description="Create a QR pass for each visitor and share it with them. Security scans it at the gate and you are notified when they arrive."
-        breadcrumbs={[{ label: "Home", href: "/resident" }, { label: "Visitors & gate" }]}
+        breadcrumbs={[{ label: "Dashboard", href: "/resident" }, { label: "Visitors & gate" }]}
         actions={<><Button variant="outline" onClick={() => setAwayOpen(true)}><Plane className="h-4 w-4" /> I&apos;m travelling</Button><Button onClick={() => setPassOpen(true)}><Plus className="h-4 w-4" /> New visitor pass</Button></>}
       />
       <Tabs className="mb-4" value={tab} onChange={setTab} items={[{ value: "passes", label: "Visitor passes" }, { value: "away", label: "Away notices" }, { value: "activity", label: "Gate activity" }]} />
