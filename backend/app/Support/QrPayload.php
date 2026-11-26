@@ -29,7 +29,7 @@ final class QrPayload
     {
         $input = trim($input);
         // A scanned share link (…/pass/<token>) is treated as the visitor token it carries.
-        if (preg_match('#/pass/([A-Za-z0-9]{40})(?:[/?#].*)?$#', $input, $m)) {
+        if (preg_match('~/pass/([A-Za-z0-9]{40})(?:[/?#].*)?$~', $input, $m)) {
             return ['type' => 'visitor', 'value' => $m[1]];
         }
         if (preg_match('/^(PAHE-[VR]):([A-Za-z0-9]{40})$/', $input, $m)) {

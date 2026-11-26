@@ -242,4 +242,14 @@ class ResidentController extends Controller
 
         return $household;
     }
+
+    private function household(Request $request): Household
+    {
+        $household = $request->user()->household();
+        if (! $household) {
+            throw new BusinessRuleException('Your account is not linked to a household yet.', 'NO_HOUSEHOLD', 404);
+        }
+
+        return $household;
+    }
 }
