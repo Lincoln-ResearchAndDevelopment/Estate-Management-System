@@ -1,17 +1,9 @@
-import type { Metadata } from "next";
-import { Suspense } from "react";
-import { Skeleton } from "@/components/ui/states";
-import { ListingSearch } from "./listing-search";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "Properties for rent and sale",
-  description: "Approved homes for rent and sale at Post Army Housing Estates, Abuja.",
-};
-
-export default function ListingsPage() {
-  return (
-    <Suspense fallback={<div className="mx-auto max-w-7xl px-4 py-10"><Skeleton className="h-96" /></div>}>
-      <ListingSearch />
-    </Suspense>
-  );
+/** The property search now lives on the landing page; old links and bookmarks keep their filters. */
+export default async function ListingsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const params = await searchParams;
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (typeof v === "string" && v) qs.set(k, v);
+  redirect(`/${qs.size ? `?${qs.toString()}` : ""}#listings`);
 }

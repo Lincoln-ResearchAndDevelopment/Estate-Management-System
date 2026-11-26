@@ -12,7 +12,7 @@ export default function NotFound() {
       </div>
       <div className="flex gap-3">
         <Link href="/" className="inline-flex h-10 items-center rounded-lg bg-army-900 px-4 text-sm font-medium text-white hover:bg-army-800">Go to home page</Link>
-        <Link href="/listings" className="inline-flex h-10 items-center rounded-lg border border-line bg-white px-4 text-sm font-medium hover:bg-army-50">Browse properties</Link>
+        <Link href="/#listings" className="inline-flex h-10 items-center rounded-lg border border-line bg-white px-4 text-sm font-medium hover:bg-army-50">Browse properties</Link>
       </div>
     </div>
   );
