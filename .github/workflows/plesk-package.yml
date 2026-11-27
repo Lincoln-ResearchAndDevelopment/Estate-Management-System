@@ -1,0 +1,111 @@
+name: Plesk package
+
+# Builds a ready-to-run copy of the system for shared Plesk hosting (no Docker, no build tools needed on
+# the server) and pushes it to the deploy/plesk branch. In Plesk, the Git tool pulls that branch.
+#   deploy/plesk/api  -> Laravel with its vendor folder (PHP 8.2). Subdomain document root: api/public
+#   deploy/plesk/web  -> Next.js standalone server. Plesk Node.js app root: web, startup file: server.js
+# Addresses come from deploy/plesk.json. Nothing secret is included: each server keeps its own api/.env.
+
+on:
+  push:
+    branches: [rebuild/pahe-v2, feature/plesk-shared-hosting]
+  workflow_dispatch:
+
+concurrency:
+  group: plesk-package
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read addresses
+        id: cfg
+        run: |
+          echo "web=$(jq -r .webUrl deploy/plesk.json | sed 's#/*$##')" >> "$GITHUB_OUTPUT"
+          echo "api=$(jq -r .apiUrl deploy/plesk.json | sed 's#/*$##')" >> "$GITHUB_OUTPUT"
+
+      # ---------------------------------------------------------------- API (Laravel)
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"   # the version the shared hosting runs
+          extensions: mbstring, pdo_mysql, intl, gd, bcmath
+          coverage: none
+      - name: Install PHP dependencies for PHP 8.2 (no dev packages)
+        working-directory: backend
+        run: |
+          composer config platform.php 8.2.0
+          composer install --no-dev --no-interaction --prefer-dist --no-progress --optimize-autoloader
+      - name: Assemble api/
+        run: |
+          mkdir -p out
+          rsync -a backend/ out/api/ \
+            --exclude '.env' --exclude 'tests/' --exclude 'phpunit.xml' --exclude 'Dockerfile' \
+            --exclude 'docker/' --exclude '.dockerignore' --exclude 'node_modules/' \
+            --exclude 'storage/logs/*.log' --exclude 'storage/framework/cache/data/*' \
+            --exclude 'storage/framework/sessions/*' --exclude 'storage/framework/views/*' \
+            --exclude 'bootstrap/cache/*.php'
+          # Keep the empty storage folders Laravel needs.
+          for d in storage/app/public storage/app/private storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs bootstrap/cache; do
+            mkdir -p "out/api/$d"; [ -e "out/api/$d/.gitignore" ] || printf '*\n!.gitignore\n' > "out/api/$d/.gitignore"
+          done
+
+      # ---------------------------------------------------------------- Web (Next.js)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"   # the oldest Node that Next.js 16 supports, so it runs on Plesk's Node 20+
+      - name: Build the web app
+        working-directory: frontend
+        env:
+          NEXT_PUBLIC_API_URL: ""
+          API_PROXY_TARGET: ${{ steps.cfg.outputs.api }}
+          NEXT_PUBLIC_SITE_URL: ${{ steps.cfg.outputs.web }}
+          NEXT_PUBLIC_ESTATE_NAME: Post Army Housing Estates
+          NEXT_TELEMETRY_DISABLED: "1"
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+      - name: Assemble web/
+        run: |
+          mkdir -p out/web
+          cp -a frontend/.next/standalone/. out/web/
+          mkdir -p out/web/.next
+          cp -a frontend/.next/static out/web/.next/static
+          cp -a frontend/public out/web/public
+          test -f out/web/server.js
+
+      - name: Readme
+        run: |
+          cat > out/README.md <<MD
+          # PAHE — Plesk deployment package (built automatically, do not edit)
+
+          Built from ${GITHUB_SHA} on $(date -u +%Y-%m-%dT%H:%MZ).
+          Web: ${{ steps.cfg.outputs.web }} · API: ${{ steps.cfg.outputs.api }}
+
+          Setup guide: documentation/plesk-shared-hosting.md on the source branch.
+          MD
+
+      # ---------------------------------------------------------------- Publish
+      - name: Push to the deploy/plesk branch
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          URL="https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          # Build on top of the previous package so Plesk's Git pull is a normal fast-forward.
+          if git ls-remote --exit-code --heads "$URL" deploy/plesk >/dev/null; then
+            git clone -q --depth 1 -b deploy/plesk "$URL" pkg
+          else
+            git init -q -b deploy/plesk pkg && git -C pkg remote add origin "$URL"
+          fi
+          rsync -a --delete --exclude '.git' out/ pkg/
+          cd pkg
+          # --force: some npm/composer packages ship .gitignore files that would otherwise drop needed files.
+          git add -A --force
+          if git diff --cached --quiet; then echo "Package unchanged"; exit 0; fi
+          git commit -qm "Plesk package for ${GITHUB_SHA::7} (${{ github.ref_name }})"
+          git push -q origin deploy/plesk

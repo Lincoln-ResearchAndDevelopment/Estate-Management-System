@@ -48,4 +48,10 @@ Schedule::command('alerts:escalate')->everyMinute()->withoutOverlapping();
 Schedule::command('access:expire')->everyFifteenMinutes();
 Schedule::command('listings:expire')->hourly()->withoutOverlapping();
 Schedule::command('queue:prune-failed --hours=168')->daily();
+
+// Shared hosting cannot keep a queue worker running, so the per-minute cron also drains the queue
+// (e-mails and other queued notifications). Docker and VPS deployments run a dedicated worker instead.
+if (config('estate.queue_via_scheduler')) {
+    Schedule::command('queue:work --stop-when-empty --max-time=50 --tries=3')->everyMinute()->withoutOverlapping();
+}
 Schedule::command('auth:clear-resets')->everyFifteenMinutes();

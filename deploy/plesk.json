@@ -1,0 +1,5 @@
+{
+  "_comment": "Public addresses of the shared-Plesk test install. The web URL is the one people visit; the API URL is the Laravel subdomain. No secrets here. Changing this file rebuilds the deploy/plesk branch.",
+  "webUrl": "https://estate.example.com",
+  "apiUrl": "https://estate-api.example.com"
+}
