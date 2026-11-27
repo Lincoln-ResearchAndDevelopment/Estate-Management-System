@@ -52,8 +52,10 @@ cp .env.plesk.example .env
 nano .env
 ```
 
-Fill in every `<...>`: the web address, the database details, your mailbox (SMTP) details and the server's IP
-address for `TRUSTED_PROXIES` (Plesk shows it under **Websites & Domains → Hosting Settings / Dashboard**).
+Replace every `CHANGE_ME` and every `yourdomain.com`: the web address, the database details, your mailbox
+(SMTP) details and the server's IP address for `TRUSTED_PROXIES` (Plesk shows it on the subscription's
+dashboard). Laravel will not start while a value contains spaces, so keep each value on one line without spaces
+(or wrap it in double quotes).
 Save with `Ctrl+O`, `Enter`, `Ctrl+X`. Then:
 
 ```bash
