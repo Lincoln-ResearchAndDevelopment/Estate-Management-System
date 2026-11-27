@@ -3,7 +3,7 @@
         'name' => 'pahe/estate-management-api',
         'pretty_version' => 'dev-feature/plesk-shared-hosting',
         'version' => 'dev-feature/plesk-shared-hosting',
-        'reference' => '9deeb5bfb2051a1bab7af3fe224894890e2ccd97',
+        'reference' => '9b8b9aad4adfa7d70fd2893e7976287d4795404a',
         'type' => 'project',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -532,7 +532,7 @@
         'pahe/estate-management-api' => array(
             'pretty_version' => 'dev-feature/plesk-shared-hosting',
             'version' => 'dev-feature/plesk-shared-hosting',
-            'reference' => '9deeb5bfb2051a1bab7af3fe224894890e2ccd97',
+            'reference' => '9b8b9aad4adfa7d70fd2893e7976287d4795404a',
             'type' => 'project',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),
