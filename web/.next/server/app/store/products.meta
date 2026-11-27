@@ -1,0 +1,44 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/(portal)/layout,_N_T_/(portal)/store/layout,_N_T_/(portal)/store/products/layout,_N_T_/(portal)/store/products/page,_N_T_/store/products"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/!KHBvcnRhbCk/store/products/__PAGE__"
+  ],
+  "prefetchHints": {
+    "hints": 64,
+    "slots": {
+      "children": {
+        "hints": 96,
+        "slots": {
+          "children": {
+            "hints": 96,
+            "slots": {
+              "children": {
+                "hints": 96,
+                "slots": {
+                  "children": {
+                    "hints": 160,
+                    "slots": null
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/ae0895293e927ed5c8dfbd1e30478c764c37eece76b4ede2746e86c79ef3f906/$/store/products",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/(portal)/store/products/page"
+    },
+    "isFallback": false
+  }
+}

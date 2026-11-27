@@ -1,0 +1,44 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/(portal)/layout,_N_T_/(portal)/admin/layout,_N_T_/(portal)/admin/reports/layout,_N_T_/(portal)/admin/reports/page,_N_T_/admin/reports"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/!KHBvcnRhbCk/admin/reports/__PAGE__"
+  ],
+  "prefetchHints": {
+    "hints": 64,
+    "slots": {
+      "children": {
+        "hints": 96,
+        "slots": {
+          "children": {
+            "hints": 96,
+            "slots": {
+              "children": {
+                "hints": 96,
+                "slots": {
+                  "children": {
+                    "hints": 160,
+                    "slots": null
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/752d9257f1bc59c2bc5b4d4e2e3a72947539f7ffa6f27af37ad4bcc605e0d41b/$/admin/reports",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/(portal)/admin/reports/page"
+    },
+    "isFallback": false
+  }
+}

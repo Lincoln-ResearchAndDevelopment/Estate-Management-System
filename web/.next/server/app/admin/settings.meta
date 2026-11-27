@@ -1,0 +1,44 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/(portal)/layout,_N_T_/(portal)/admin/layout,_N_T_/(portal)/admin/settings/layout,_N_T_/(portal)/admin/settings/page,_N_T_/admin/settings"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/!KHBvcnRhbCk/admin/settings/__PAGE__"
+  ],
+  "prefetchHints": {
+    "hints": 64,
+    "slots": {
+      "children": {
+        "hints": 96,
+        "slots": {
+          "children": {
+            "hints": 96,
+            "slots": {
+              "children": {
+                "hints": 96,
+                "slots": {
+                  "children": {
+                    "hints": 160,
+                    "slots": null
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/3e453888aa0c095b0c4449f3539afd74db1c960fa9897dfc39bf5654a5b21405/$/admin/settings",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/(portal)/admin/settings/page"
+    },
+    "isFallback": false
+  }
+}

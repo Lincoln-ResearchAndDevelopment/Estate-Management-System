@@ -1,0 +1,3 @@
+module.exports=[266,a=>{"use strict";let b=(0,a.i(11857).registerClientReference)(function(){throw Error("Attempted to call the default export of [project]/src/app/(portal)/layout.tsx from the server, but it's on the client. It's not possible to invoke a client function from the server, it can only be rendered as a Component or passed to props of a Client Component.")},"[project]/src/app/(portal)/layout.tsx","default");a.s(["default",0,b])},39621,a=>{"use strict";var b=a.i(266);a.n(b)},47907,function(a){a.n(a.i(39621))}];
+
+//# sourceMappingURL=src_app_%28portal%29_layout_tsx_11uzj8kquo329._.js.map

@@ -1,0 +1,1 @@
+(globalThis.TURBOPACK||(globalThis.TURBOPACK=[])).push(["object"==typeof document?document.currentScript:void 0,51872,e=>{"use strict";var s=e.i(43476),t=e.i(17612);e.s(["default",0,function({error:e,reset:a}){return(0,s.jsx)("div",{className:"card",children:(0,s.jsx)(t.D,{message:e.message||"This page failed to load.",onRetry:a})})}])}]);

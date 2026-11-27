@@ -1,0 +1,44 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/(portal)/layout,_N_T_/(portal)/security/layout,_N_T_/(portal)/security/blacklist/layout,_N_T_/(portal)/security/blacklist/page,_N_T_/security/blacklist"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/!KHBvcnRhbCk/security/blacklist/__PAGE__"
+  ],
+  "prefetchHints": {
+    "hints": 64,
+    "slots": {
+      "children": {
+        "hints": 96,
+        "slots": {
+          "children": {
+            "hints": 96,
+            "slots": {
+              "children": {
+                "hints": 96,
+                "slots": {
+                  "children": {
+                    "hints": 160,
+                    "slots": null
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/2cad5a8ec21d31a33b661fd62418383cf19316d20815e03d0aec5469d97c70fa/$/security/blacklist",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/(portal)/security/blacklist/page"
+    },
+    "isFallback": false
+  }
+}

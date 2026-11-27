@@ -1,0 +1,44 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/(portal)/layout,_N_T_/(portal)/resident/layout,_N_T_/(portal)/resident/finance/layout,_N_T_/(portal)/resident/finance/page,_N_T_/resident/finance"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/!KHBvcnRhbCk/resident/finance/__PAGE__"
+  ],
+  "prefetchHints": {
+    "hints": 64,
+    "slots": {
+      "children": {
+        "hints": 96,
+        "slots": {
+          "children": {
+            "hints": 96,
+            "slots": {
+              "children": {
+                "hints": 96,
+                "slots": {
+                  "children": {
+                    "hints": 160,
+                    "slots": null
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/bad82d281008ee0f85791fc20a78c835bf9d184ded237521ce945e2b1c372110/$/resident/finance",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/(portal)/resident/finance/page"
+    },
+    "isFallback": false
+  }
+}

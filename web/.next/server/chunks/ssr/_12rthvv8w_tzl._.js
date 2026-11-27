@@ -1,0 +1,3 @@
+module.exports=[50522,a=>{"use strict";let b=(0,a.i(70106).f)("ChevronRight",[["path",{d:"m9 18 6-6-6-6",key:"mthhwq"}]]);a.s(["f",0,b],50522)},62993,a=>{"use strict";let b=a.i(71811).z.string().min(8,"Use at least 8 characters.").regex(/[a-z]/,"Include a lowercase letter.").regex(/[A-Z]/,"Include an uppercase letter.").regex(/\d/,"Include a number.").regex(/[^A-Za-z0-9]/,"Include a symbol.");a.s(["U",0,/^\+234\d{10}$/,"_",0,"Enter a Nigerian mobile number like +2348012345678.","S",0,b])}];
+
+//# sourceMappingURL=_12rthvv8w_tzl._.js.map

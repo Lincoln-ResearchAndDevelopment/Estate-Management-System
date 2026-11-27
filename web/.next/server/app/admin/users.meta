@@ -1,0 +1,44 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/(portal)/layout,_N_T_/(portal)/admin/layout,_N_T_/(portal)/admin/users/layout,_N_T_/(portal)/admin/users/page,_N_T_/admin/users"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/!KHBvcnRhbCk/admin/users/__PAGE__"
+  ],
+  "prefetchHints": {
+    "hints": 64,
+    "slots": {
+      "children": {
+        "hints": 96,
+        "slots": {
+          "children": {
+            "hints": 96,
+            "slots": {
+              "children": {
+                "hints": 96,
+                "slots": {
+                  "children": {
+                    "hints": 160,
+                    "slots": null
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/d233a0ac13144fe77457e968c9d2399740c012f2029e096fca6dd98fcb9eb84c/$/admin/users",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/(portal)/admin/users/page"
+    },
+    "isFallback": false
+  }
+}

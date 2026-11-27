@@ -1,0 +1,44 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/(portal)/layout,_N_T_/(portal)/admin/layout,_N_T_/(portal)/admin/listings/layout,_N_T_/(portal)/admin/listings/page,_N_T_/admin/listings"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/!KHBvcnRhbCk/admin/listings/__PAGE__"
+  ],
+  "prefetchHints": {
+    "hints": 64,
+    "slots": {
+      "children": {
+        "hints": 96,
+        "slots": {
+          "children": {
+            "hints": 96,
+            "slots": {
+              "children": {
+                "hints": 96,
+                "slots": {
+                  "children": {
+                    "hints": 160,
+                    "slots": null
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/90e8c9f15c75b0f2f0c10bed42d4e6a354c0bf893c1b2037d2046996452fe0f1/$/admin/listings",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/(portal)/admin/listings/page"
+    },
+    "isFallback": false
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/(portal)/layout,_N_T_/(portal)/agent/layout,_N_T_/(portal)/agent/listings/layout,_N_T_/(portal)/agent/listings/page,_N_T_/agent/listings"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/!KHBvcnRhbCk/agent/listings/__PAGE__"
+  ],
+  "prefetchHints": {
+    "hints": 64,
+    "slots": {
+      "children": {
+        "hints": 96,
+        "slots": {
+          "children": {
+            "hints": 96,
+            "slots": {
+              "children": {
+                "hints": 96,
+                "slots": {
+                  "children": {
+                    "hints": 160,
+                    "slots": null
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/226287cba45c37eb421c4a98f4e258d1f2582541891df3efe1bfcc612f2b5355/$/agent/listings",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/(portal)/agent/listings/page"
+    },
+    "isFallback": false
+  }
+}

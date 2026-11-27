@@ -1,0 +1,44 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/(portal)/layout,_N_T_/(portal)/security/layout,_N_T_/(portal)/security/alerts/layout,_N_T_/(portal)/security/alerts/page,_N_T_/security/alerts"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/!KHBvcnRhbCk/security/alerts/__PAGE__"
+  ],
+  "prefetchHints": {
+    "hints": 64,
+    "slots": {
+      "children": {
+        "hints": 96,
+        "slots": {
+          "children": {
+            "hints": 96,
+            "slots": {
+              "children": {
+                "hints": 96,
+                "slots": {
+                  "children": {
+                    "hints": 160,
+                    "slots": null
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/91f0235c3a25b8748efdd68b9801c5cc359d54bc411a6f5c4ef0ca871bec799c/$/security/alerts",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/(portal)/security/alerts/page"
+    },
+    "isFallback": false
+  }
+}

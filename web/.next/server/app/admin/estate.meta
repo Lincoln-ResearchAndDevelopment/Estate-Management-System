@@ -1,0 +1,44 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/(portal)/layout,_N_T_/(portal)/admin/layout,_N_T_/(portal)/admin/estate/layout,_N_T_/(portal)/admin/estate/page,_N_T_/admin/estate"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/!KHBvcnRhbCk/admin/estate/__PAGE__"
+  ],
+  "prefetchHints": {
+    "hints": 64,
+    "slots": {
+      "children": {
+        "hints": 96,
+        "slots": {
+          "children": {
+            "hints": 96,
+            "slots": {
+              "children": {
+                "hints": 96,
+                "slots": {
+                  "children": {
+                    "hints": 160,
+                    "slots": null
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/e0da60d88dd3237bd0e21aa0ca5798860a2fcc15724595ace132edffdcd1af0e/$/admin/estate",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/(portal)/admin/estate/page"
+    },
+    "isFallback": false
+  }
+}

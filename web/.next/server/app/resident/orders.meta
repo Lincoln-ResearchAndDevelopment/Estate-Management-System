@@ -1,0 +1,44 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/(portal)/layout,_N_T_/(portal)/resident/layout,_N_T_/(portal)/resident/orders/layout,_N_T_/(portal)/resident/orders/page,_N_T_/resident/orders"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/!KHBvcnRhbCk/resident/orders/__PAGE__"
+  ],
+  "prefetchHints": {
+    "hints": 64,
+    "slots": {
+      "children": {
+        "hints": 96,
+        "slots": {
+          "children": {
+            "hints": 96,
+            "slots": {
+              "children": {
+                "hints": 96,
+                "slots": {
+                  "children": {
+                    "hints": 160,
+                    "slots": null
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/ab5d6b770404930470878297abe343eb9f4ed124725c68e1c74a2011dddfe51c/$/resident/orders",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/(portal)/resident/orders/page"
+    },
+    "isFallback": false
+  }
+}

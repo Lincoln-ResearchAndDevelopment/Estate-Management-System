@@ -1,0 +1,44 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/(portal)/layout,_N_T_/(portal)/resident/layout,_N_T_/(portal)/resident/direction/layout,_N_T_/(portal)/resident/direction/page,_N_T_/resident/direction"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/!KHBvcnRhbCk/resident/direction/__PAGE__"
+  ],
+  "prefetchHints": {
+    "hints": 64,
+    "slots": {
+      "children": {
+        "hints": 96,
+        "slots": {
+          "children": {
+            "hints": 96,
+            "slots": {
+              "children": {
+                "hints": 96,
+                "slots": {
+                  "children": {
+                    "hints": 160,
+                    "slots": null
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/985f04344a432e7278a37e930acb2182a68f20f9bc6c3e644d6b2ae7083d91ab/$/resident/direction",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/(portal)/resident/direction/page"
+    },
+    "isFallback": false
+  }
+}

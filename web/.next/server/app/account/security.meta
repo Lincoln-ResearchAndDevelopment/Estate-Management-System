@@ -1,0 +1,44 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/(portal)/layout,_N_T_/(portal)/account/layout,_N_T_/(portal)/account/security/layout,_N_T_/(portal)/account/security/page,_N_T_/account/security"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/!KHBvcnRhbCk/account/security/__PAGE__"
+  ],
+  "prefetchHints": {
+    "hints": 64,
+    "slots": {
+      "children": {
+        "hints": 96,
+        "slots": {
+          "children": {
+            "hints": 96,
+            "slots": {
+              "children": {
+                "hints": 96,
+                "slots": {
+                  "children": {
+                    "hints": 160,
+                    "slots": null
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/7e3c6ea9d9195473d08d153eb94bf3cb69ed3aaf6dc40e7999415b32f2e126b8/$/account/security",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/(portal)/account/security/page"
+    },
+    "isFallback": false
+  }
+}

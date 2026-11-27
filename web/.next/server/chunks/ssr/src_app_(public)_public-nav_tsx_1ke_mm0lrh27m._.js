@@ -1,0 +1,3 @@
+module.exports=[74826,a=>{"use strict";var b=a.i(87924),c=a.i(38246),d=a.i(21452);a.s(["PublicNav",0,function(){let{session:a}=(0,d.F)(),e="inline-flex h-9 items-center rounded-lg bg-army-800 px-5 text-sm font-semibold text-white hover:bg-army-900";return a?(0,b.jsx)(c.default,{href:a.portal,className:e,children:"My portal"}):(0,b.jsx)(c.default,{href:"/login",className:e,children:"Sign in"})}])}];
+
+//# sourceMappingURL=src_app_%28public%29_public-nav_tsx_1ke_mm0lrh27m._.js.map

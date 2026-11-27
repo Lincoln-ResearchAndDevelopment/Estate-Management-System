@@ -1,0 +1,49 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/(portal)/layout,_N_T_/(portal)/agent/layout,_N_T_/(portal)/agent/listings/layout,_N_T_/(portal)/agent/listings/new/layout,_N_T_/(portal)/agent/listings/new/page,_N_T_/agent/listings/new"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/!KHBvcnRhbCk/agent/listings/new/__PAGE__"
+  ],
+  "prefetchHints": {
+    "hints": 64,
+    "slots": {
+      "children": {
+        "hints": 96,
+        "slots": {
+          "children": {
+            "hints": 96,
+            "slots": {
+              "children": {
+                "hints": 96,
+                "slots": {
+                  "children": {
+                    "hints": 96,
+                    "slots": {
+                      "children": {
+                        "hints": 160,
+                        "slots": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/8292bb7d1382cddf451f47f64d9f39f64324e7d11b48593974a96ed9955c8454/$/agent/listings/new",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/(portal)/agent/listings/new/page"
+    },
+    "isFallback": false
+  }
+}

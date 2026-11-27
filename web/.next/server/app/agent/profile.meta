@@ -1,0 +1,44 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/(portal)/layout,_N_T_/(portal)/agent/layout,_N_T_/(portal)/agent/profile/layout,_N_T_/(portal)/agent/profile/page,_N_T_/agent/profile"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/!KHBvcnRhbCk/agent/profile/__PAGE__"
+  ],
+  "prefetchHints": {
+    "hints": 64,
+    "slots": {
+      "children": {
+        "hints": 96,
+        "slots": {
+          "children": {
+            "hints": 96,
+            "slots": {
+              "children": {
+                "hints": 96,
+                "slots": {
+                  "children": {
+                    "hints": 160,
+                    "slots": null
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/d6d806ae2b3ddada7118ade38bbe4c1228137be711afba008edc1781bf5bffff/$/agent/profile",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/(portal)/agent/profile/page"
+    },
+    "isFallback": false
+  }
+}

@@ -1,0 +1,49 @@
+1:"$Sreact.fragment"
+2:"/_next/static/chunks/3d7xoecyee41z.js"
+3:"/_next/static/chunks/3hh0e5s3-055m.js"
+4:"/_next/static/chunks/2xzu9-m3mt7sm.js"
+5:"/_next/static/chunks/3qun8tnk_7u-y.js"
+6:I[39948,["$2","$3","$4","$5"],"Providers"]
+7:I[39756,["$2","$3","$4","$5"],"default"]
+8:"/_next/static/chunks/0wqmvblmwvkiy.js"
+9:I[58298,["$2","$3","$4","$5","$8"],"default"]
+a:I[37457,["$2","$3","$4","$5"],"default"]
+b:"/_next/static/chunks/3zt_16xndew4w.js"
+c:I[22016,["$2","$3","$4","$5","$b"],""]
+e:"ClientSegmentRoot"
+f:I[92825,["$2","$3","$4","$5"],"$e"]
+10:"/_next/static/chunks/3gft70l9q60my.js"
+11:I[64525,["$2","$3","$4","$5","$10"],"default"]
+12:"/_next/static/chunks/2jvye03zywzn2.js"
+13:I[51872,["$2","$3","$4","$5","$10","$12"],"default"]
+1c:"ViewportBoundary"
+1d:I[97367,["$2","$3","$4","$5"],"$1c"]
+1f:"MetadataBoundary"
+20:I[97367,["$2","$3","$4","$5"],"$1f"]
+21:"$Sreact.suspense"
+23:I[68027,["$2","$3","$4","$5"],"default",1]
+:HL["/_next/static/chunks/3ysh949mteord.css","style"]
+:HL["/_next/static/media/07c7676b89ed2778-s.p.2bn3s6zvc0dyp.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
+:HL["/_next/static/media/31492d5cb52598a7-s.p.3arxh35s5-kc0.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
+:HL["/_next/static/media/6f864d052989467c-s.p.240fzfer9e_rh.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
+:HL["/_next/static/media/cbeb9a28518e6bbd-s.p.1zrwl0c4yv3pr.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
+17:X
+1a:[["children",{"s":"__PAGE__","h":512,"d":{"r":"$L1b","p":false,"v":null}}]]
+18:[["children",{"s":"enquiries","h":512,"d":{"r":"$L19","p":false,"v":"$17"},"c":"$Q1a"}]]
+15:[["children",{"s":"agent","h":512,"d":{"r":"$L16","p":false,"v":"$17"},"c":"$Q18"}]]
+d:[["children",{"s":"(portal)","h":512,"d":{"r":["$","$1","c",{"children":[[["$","script","script-0",{"src":"/_next/static/chunks/3gft70l9q60my.js","async":true,"nonce":"$undefined"}]],["$","$Lf",null,{"Component":"$11","slots":{"children":["$","$L7",null,{"parallelRouterKey":"children","error":"$13","errorStyles":[],"errorScripts":[["$","script","script-0",{"src":"/_next/static/chunks/2jvye03zywzn2.js","async":true,"nonce":"$undefined"}]],"template":["$","$La",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":[["$","div",null,{"className":"flex min-h-dvh flex-col items-center justify-center gap-6 px-4 text-center","children":[["$","div",null,{"className":"flex items-center gap-3","children":[["$","span",null,{"className":"flex h-10 w-10 shrink-0 items-center justify-center rounded-lg font-display text-sm font-bold tracking-wider bg-army-900 text-gold-500","aria-hidden":true,"children":"PAHE"}],["$","span",null,{"className":"min-w-0 leading-tight","children":[["$","span",null,{"className":"block truncate font-display text-base font-semibold text-ink-900","children":"Post Army Housing Estates"}],"$undefined"]}]]}],["$","div",null,{"children":[["$","p",null,{"className":"font-display text-5xl font-semibold text-army-900","children":"404"}],["$","h1",null,{"className":"mt-2 text-xl font-semibold","children":"Page not found"}],["$","p",null,{"className":"mt-1 text-sm text-ink-600","children":"The page you are looking for does not exist or is no longer available."}]]}],["$","div",null,{"className":"flex gap-3","children":[["$","$Lc",null,{"href":"/","className":"inline-flex h-10 items-center rounded-lg bg-army-900 px-4 text-sm font-medium text-white hover:bg-army-800","children":"Go to home page"}],["$","$Lc",null,{"href":"/#listings","className":"inline-flex h-10 items-center rounded-lg border border-line bg-white px-4 text-sm font-medium hover:bg-army-50","children":"Browse properties"}]]}]]}],[]],"forbidden":"$undefined","unauthorized":"$undefined"}]},"serverProvidedParams":{"params":{},"promises":["$@14"]}}]]}],"p":false,"v":null},"c":"$Q15"}]]
+0:{"P":null,"c":["","agent","enquiries"],"q":"","i":false,"t":{"t":{"s":"","h":528,"d":{"r":["$","$1","c",{"children":[[["$","link","0",{"rel":"stylesheet","href":"/_next/static/chunks/3ysh949mteord.css","precedence":"next","crossOrigin":"$undefined","nonce":"$undefined"}],["$","script","script-0",{"src":"/_next/static/chunks/3d7xoecyee41z.js","async":true,"nonce":"$undefined"}],["$","script","script-1",{"src":"/_next/static/chunks/3hh0e5s3-055m.js","async":true,"nonce":"$undefined"}],["$","script","script-2",{"src":"/_next/static/chunks/2xzu9-m3mt7sm.js","async":true,"nonce":"$undefined"}],["$","script","script-3",{"src":"/_next/static/chunks/3qun8tnk_7u-y.js","async":true,"nonce":"$undefined"}]],["$","html",null,{"lang":"en-NG","className":"_0bjUvq_variable _9CS2sq_variable","children":["$","body",null,{"children":["$","$L6",null,{"children":["$","$L7",null,{"parallelRouterKey":"children","error":"$9","errorStyles":[],"errorScripts":[["$","script","script-0",{"src":"/_next/static/chunks/0wqmvblmwvkiy.js","async":true,"nonce":"$undefined"}]],"template":["$","$La",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":[["$","div",null,{"className":"flex min-h-dvh flex-col items-center justify-center gap-6 px-4 text-center","children":[["$","div",null,{"className":"flex items-center gap-3","children":[["$","span",null,{"className":"flex h-10 w-10 shrink-0 items-center justify-center rounded-lg font-display text-sm font-bold tracking-wider bg-army-900 text-gold-500","aria-hidden":true,"children":"PAHE"}],["$","span",null,{"className":"min-w-0 leading-tight","children":[["$","span",null,{"className":"block truncate font-display text-base font-semibold text-ink-900","children":"Post Army Housing Estates"}],"$undefined"]}]]}],["$","div",null,{"children":[["$","p",null,{"className":"font-display text-5xl font-semibold text-army-900","children":"404"}],["$","h1",null,{"className":"mt-2 text-xl font-semibold","children":"Page not found"}],["$","p",null,{"className":"mt-1 text-sm text-ink-600","children":"The page you are looking for does not exist or is no longer available."}]]}],["$","div",null,{"className":"flex gap-3","children":[["$","$Lc",null,{"href":"/","className":"inline-flex h-10 items-center rounded-lg bg-army-900 px-4 text-sm font-medium text-white hover:bg-army-800","children":"Go to home page"}],["$","$Lc",null,{"href":"/#listings","className":"inline-flex h-10 items-center rounded-lg border border-line bg-white px-4 text-sm font-medium hover:bg-army-50","children":"Browse properties"}]]}]]}],[]],"forbidden":"$undefined","unauthorized":"$undefined"}]}]}]}]]}],"p":false,"v":null},"c":"$Qd"},"h":{"r":["$","$1","h",{"children":[null,["$","$L1d",null,{"children":"$L1e"}],["$","$L20",null,{"children":[["$","div",null,{"hidden":true,"children":["$","$21",null,{"name":"Next.Metadata","children":"$L22"}]}],null]}],["$","meta",null,{"name":"next-size-adjust","content":""}]]}],"p":false,"v":null}},"m":"$undefined","G":["$23",[["$","link","0",{"rel":"stylesheet","href":"/_next/static/chunks/3ysh949mteord.css","precedence":"next","crossOrigin":"$undefined","nonce":"$undefined"}]]],"S":true,"r":"$undefined","s":"$undefined","a":"$undefined","l":"$undefined","p":"$undefined","d":"$undefined","b":"Jy03f3bqE00uJr3uZrnUw"}
+24:I[47257,["$2","$3","$4","$5"],"ClientPageRoot"]
+25:"/_next/static/chunks/1nsu8i5xcmaxf.js"
+26:I[359,["$2","$3","$4","$5","$10","$25"],"default"]
+29:I[97367,["$2","$3","$4","$5"],"OutletBoundary"]
+16:["$","$1","c",{"children":[null,["$","$L7",null,{"parallelRouterKey":"children","error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$La",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":"$undefined","forbidden":"$undefined","unauthorized":"$undefined"}]]}]
+19:["$","$1","c",{"children":[null,["$","$L7",null,{"parallelRouterKey":"children","error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$La",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":"$undefined","forbidden":"$undefined","unauthorized":"$undefined"}]]}]
+1b:["$","$1","c",{"children":[["$","$L24",null,{"Component":"$26","serverProvidedParams":{"searchParams":{},"params":"$d:0:1:d:r:props:children:1:props:serverProvidedParams:params","promises":["$@27","$@28"]}}],[["$","script","script-0",{"src":"/_next/static/chunks/1nsu8i5xcmaxf.js","async":true,"nonce":"$undefined"}]],["$","$L29",null,{"children":["$","$21",null,{"name":"Next.MetadataOutlet","children":"$@2a"}]}]]}]
+14:"$d:0:1:d:r:props:children:1:props:serverProvidedParams:params"
+17:C
+27:{}
+28:"$d:0:1:d:r:props:children:1:props:serverProvidedParams:params"
+1e:[["$","meta","0",{"charSet":"utf-8"}],["$","meta","1",{"name":"viewport","content":"width=device-width, initial-scale=1"}],["$","meta","2",{"name":"theme-color","content":"#18392B"}]]
+22:[["$","title","0",{"children":"Post Army Housing Estates"}],["$","meta","1",{"name":"description","content":"Homes for rent and sale at Post Army Housing Estates, Abuja, and the estate's resident and management portal."}]]
+2a:null

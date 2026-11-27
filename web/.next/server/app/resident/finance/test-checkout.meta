@@ -1,0 +1,49 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/(portal)/layout,_N_T_/(portal)/resident/layout,_N_T_/(portal)/resident/finance/layout,_N_T_/(portal)/resident/finance/test-checkout/layout,_N_T_/(portal)/resident/finance/test-checkout/page,_N_T_/resident/finance/test-checkout"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/!KHBvcnRhbCk/resident/finance/test-checkout/__PAGE__"
+  ],
+  "prefetchHints": {
+    "hints": 64,
+    "slots": {
+      "children": {
+        "hints": 96,
+        "slots": {
+          "children": {
+            "hints": 96,
+            "slots": {
+              "children": {
+                "hints": 96,
+                "slots": {
+                  "children": {
+                    "hints": 96,
+                    "slots": {
+                      "children": {
+                        "hints": 160,
+                        "slots": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/baec1e52a35d1f2420dd3170d14e40de16392bce049a4900c0504729f60572b8/$/resident/finance/test-checkout",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/(portal)/resident/finance/test-checkout/page"
+    },
+    "isFallback": false
+  }
+}

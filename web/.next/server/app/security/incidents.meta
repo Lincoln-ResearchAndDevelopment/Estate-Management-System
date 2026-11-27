@@ -1,0 +1,44 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/(portal)/layout,_N_T_/(portal)/security/layout,_N_T_/(portal)/security/incidents/layout,_N_T_/(portal)/security/incidents/page,_N_T_/security/incidents"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/!KHBvcnRhbCk/security/incidents/__PAGE__"
+  ],
+  "prefetchHints": {
+    "hints": 64,
+    "slots": {
+      "children": {
+        "hints": 96,
+        "slots": {
+          "children": {
+            "hints": 96,
+            "slots": {
+              "children": {
+                "hints": 96,
+                "slots": {
+                  "children": {
+                    "hints": 160,
+                    "slots": null
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/8a628191b36ab461b175dcd665c8b2d88ae7edd93afe0498ad7d7f210262c77f/$/security/incidents",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/(portal)/security/incidents/page"
+    },
+    "isFallback": false
+  }
+}

@@ -1,0 +1,3 @@
+{
+  "/(portal)/security/blacklist/page": "app/(portal)/security/blacklist/page.js"
+}
